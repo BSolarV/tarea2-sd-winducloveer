@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	protoNode "github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
+
 	"google.golang.org/grpc"
 )
 
@@ -65,6 +67,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	// ProtoLogistic.RegisterProtoLogisticServiceServer(grpcServer, srv)
+	protoNode.RegisterProtoServiceServer(grpcServer, srv)
 
 	// Montando servidor GRPC
 	if err := grpcServer.Serve(lis); err != nil {

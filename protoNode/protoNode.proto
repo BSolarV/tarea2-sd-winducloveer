@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package protoNode;
+
+// Para leer/escribir en el log 
+message LogData { 
+    string id = 1;
+    string message = 2;
+    string timestamp = 3; 
+}
+
+// Quiero leer/escribir el log (se lo envio a todos)
+message WriteRequest {
+    string id = 1;
+    int64 node = 2;
+    string timestamp = 3; 
+}
+
+
+// Enviamos una propuesta al nodo (al nodo que recibe el msg)
+message Proporsal {
+    string id = 1;
+    int64 node = 2;
+    int64 numChunks = 3;
+    string timestamp = 4;
+}
+
+
+// 1 = apruebo  0 = rechazo
+message Response {
+    string id = 1;
+    string timestamp = 2;
+    bool response = 3;
+}
+
+
+// Chunk
+message ChunkPackage {
+    string id = 1;
+    string bookName = 2;
+    int64 numChunkTotal = 3; 
+    int64 numChunkActual = 4;
+    bytes chunk = 5;
+}
+
+message Empty {}
+
+service protoService {
+
+    // Metodos entre Datanodes
+    rpc sendChunk(ChunkPackage) returns (Empty) {}
+    rpc writePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
+
+    // Metodos NameNode-DataNode
+    rpc updateLog(LogData) returns (Empty) {}
+
+    // Metodos DataNode-DataNode y NameNode-Datanode
+    rpc checkProporsal(Proporsal) returns (Response) {}
+}
+
+option go_package = "github.com/BSolarV/tarea2-sd-winducloveer/protoNode";
