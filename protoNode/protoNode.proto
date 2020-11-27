@@ -9,7 +9,16 @@ message LogData {
     string timestamp = 3; 
 }
 
-// Quiero leer/escribir el log (se lo envio a todos)
+// Quiero leer el log (se lo envio a todos)
+message ReadRequest {
+    string id = 1;
+    int64 node = 2;
+    string bookname = 3; 
+    string timestamp = 4; 
+}
+
+
+// Quiero escribir el log (se lo envio a todos)
 message WriteRequest {
     string id = 1;
     int64 node = 2;

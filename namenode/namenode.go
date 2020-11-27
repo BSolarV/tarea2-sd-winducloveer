@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -60,7 +61,7 @@ func main() {
 	defer lis.Close()
 
 	// Creando instancia del nodo
-	srv := newDataNode()
+	srv := newNameNode()
 	// creando instancia de servidor GRPC
 	grpcServer := grpc.NewServer()
 
@@ -73,11 +74,12 @@ func main() {
 
 }
 
-// reparto siempre seguira un orden especifico de ip's
 type Book struct {
-	bookname   string
-	cantPartes int
-	reparto    []int
+	id            string
+	bookname      string
+	partsNum      string
+	partsLocation []string
+	timestamp     string
 }
 
 type NameNode struct {
@@ -93,4 +95,44 @@ func newNameNode() *Server {
 	var srv Server
 
 	return &srv
+}
+
+//ReadRequest es invocada por el cliente para leer el log
+func (s *Server) ReadRequest(ctx context.Context, request *proto.ReadRequest) (*proto.LogData, error) {
+	mutex.lock()
+	var paq *proto.LogData
+	for _, book := range log {
+		aux := ""
+		if book.bookname == request.bookname {
+			paq.id = book.id
+			paq.timestamp = book.timestamp
+			msg := book.bookname + ";" + book.partsNum + ";"
+			for _, part := range book.partsLocation {
+				aux += part + ","
+			}
+		}
+	}
+	mutex.unlock()
+	msg += aux
+
+	paq.message = msg[:-1]
+
+	return paq, nil
+}
+
+func (s *Server) WriteRequest(ctx context.Context, request *proto.EditRequest) (*proto.Response, error) {
+
+}
+
+//cuando el nodo reune permisos escribe con esta funcion
+func (s *Server) WriteLog(ctx context.Context, packageToWrite *proto.LogData) (*proto.Empty, error) {
+	mutex.lock()
+	var book Book;
+	book.id = packageToWrite.Getid()
+	
+	book.bookname = packageToWrite.Getbookname()
+	book.partsNum = packageToWrite.
+
+	log = append(log, book)
+	
 }
