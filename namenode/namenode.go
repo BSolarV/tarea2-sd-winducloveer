@@ -75,9 +75,9 @@ func main() {
 
 // reparto siempre seguira un orden especifico de ip's
 type Book struct {
-	bookname    string
-	cant_Partes int
-	reparto     []int
+	bookname   string
+	cantPartes int
+	reparto    []int
 }
 
 type NameNode struct {
