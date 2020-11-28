@@ -77,6 +77,8 @@ func main() {
 }
 
 type DataNode struct {
+	proposalQueue      []string
+	writeProposalQueue []string
 
 	// Para bloquear recursos entre hilos
 	mutex sync.Mutex
@@ -87,4 +89,22 @@ func newDataNode() *DataNode {
 	var srv DataNode
 
 	return &srv
+}
+
+//Usaremos bully algorithm de https://moodle.inf.utfsm.cl/pluginfile.php/104700/mod_resource/content/0/Chapter%204_clase3.pdf
+func MakeProposal() {
+
+}
+
+func CheckProposal() {
+
+}
+
+func WriteProposal() {
+
+}
+
+//aquí se aplica ricart y agrawala
+func CheckWriteProposal() {
+
 }
