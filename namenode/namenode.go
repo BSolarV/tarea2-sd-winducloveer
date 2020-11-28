@@ -86,6 +86,8 @@ type NameNode struct {
 
 	//el log es el registro de los libros
 	log []Book
+
+	writequeue 
 	// Para bloquear recursos entre hilos
 	mutex sync.Mutex
 }
@@ -99,7 +101,7 @@ func newNameNode() *Server {
 
 //ReadRequest es invocada por el cliente para leer el log
 func (s *Server) ReadRequest(ctx context.Context, request *proto.ReadRequest) (*proto.LogData, error) {
-	mutex.lock()
+	mutex.Lock()
 	var paq *proto.LogData
 	for _, book := range log {
 		aux := ""
@@ -112,7 +114,7 @@ func (s *Server) ReadRequest(ctx context.Context, request *proto.ReadRequest) (*
 			}
 		}
 	}
-	mutex.unlock()
+	mutex.Unlock()
 	msg += aux
 
 	paq.message = msg[:-1]
@@ -120,19 +122,30 @@ func (s *Server) ReadRequest(ctx context.Context, request *proto.ReadRequest) (*
 	return paq, nil
 }
 
+//esta función es innecesaria al parecer
 func (s *Server) WriteRequest(ctx context.Context, request *proto.EditRequest) (*proto.Response, error) {
-
+	return nil,nil
 }
 
 //cuando el nodo reune permisos escribe con esta funcion
 func (s *Server) WriteLog(ctx context.Context, packageToWrite *proto.LogData) (*proto.Empty, error) {
-	mutex.lock()
-	var book Book;
+	mutex.Lock()
+	var book Book
+
+	aux := packageToWrite.Getmessage()
+	aux = strings.Split(aux, ";")
+	aux2 := strings.Split(aux[2], ",")
+
 	book.id = packageToWrite.Getid()
-	
-	book.bookname = packageToWrite.Getbookname()
-	book.partsNum = packageToWrite.
+	book.bookname = aux[0]
+	book.partsNum = aux[1]
+	book.partsLocation = aux2
+	book.timestamp = //quien crea el timestamp??
 
 	log = append(log, book)
-	
+
+	mutex.Unlock()
+
+	return  proto.Empty{}, nil
+
 }
