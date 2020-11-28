@@ -83,8 +83,8 @@ type DataNode struct {
 }
 
 //NewServer es el constructor del Server
-func newDataNode() *Server {
-	var srv Server
+func newDataNode() *DataNode {
+	var srv DataNode
 
 	return &srv
 }
