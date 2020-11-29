@@ -54,21 +54,25 @@ message ChunkPackage {
 
 message Empty {}
 
-service protoService {
+service ProtoService {
 
     // Metodos entre Datanodes
-    rpc sendChunk(ChunkPackage) returns (Empty) {}
-    rpc writePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
+        // Envia el chunk a guardar
+    rpc RecieveChunk(ChunkPackage) returns (Empty) {}
+        // Coordinación entre DataNodes para escribir en el log de NameNode 
+    rpc WritePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
 
     // Metodos NameNode-DataNode
-    rpc updateLog(LogData) returns (Empty) {}
+        // Escritura de DataNode en NameNode
+    rpc UpdateLog(LogData) returns (Empty) {}
 
     // Metodos DataNode-DataNode y NameNode-Datanode
-    rpc checkProporsal(Proporsal) returns (Response) {}
+        // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
+    rpc CheckProporsal(Proporsal) returns (Response) {}
 }
 
 option go_package = "github.com/BSolarV/tarea2-sd-winducloveer/protoNode";
 
 
 // Pa compilar
-// protoc --go_opt=paths=source_relative --go_out=plugins=grpc:. protoNode.proto 
+// protoc --go_opt=paths=source_relative --go_out=plugins=grpc:. .\protoNode\protoNode.proto

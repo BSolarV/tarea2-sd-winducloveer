@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -76,6 +77,12 @@ func main() {
 
 }
 
+// DataNode debe implementar:
+//	sendChunk(ChunkPackage) returns (Empty) {}
+//	writePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
+//	updateLog(LogData) returns (Empty) {}
+//	checkProporsal(Proporsal) returns (Response) {}
+
 type DataNode struct {
 	proposalQueue      []string
 	writeProposalQueue []string
@@ -84,7 +91,7 @@ type DataNode struct {
 	mutex sync.Mutex
 }
 
-//NewServer es el constructor del Server
+//newDataNode es el constructor del Server
 func newDataNode() *DataNode {
 	var srv DataNode
 
@@ -92,19 +99,29 @@ func newDataNode() *DataNode {
 }
 
 //Usaremos bully algorithm de https://moodle.inf.utfsm.cl/pluginfile.php/104700/mod_resource/content/0/Chapter%204_clase3.pdf
-func MakeProposal() {
-
+func (*DataNode) BuildProposal() (*protoNode.Proporsal, error) {
+	return &protoNode.Proporsal{}, nil
 }
 
-func CheckProposal() {
-
+//checkProporsal: Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
+func (*DataNode) CheckProporsal(ctx context.Context, proporsal *protoNode.Proporsal) (*protoNode.Response, error) {
+	response := &protoNode.Response{}
+	return response, nil
 }
 
-func WriteProposal() {
-
+//updateLog: Escritura de DataNode en NameNode
+func (*DataNode) UpdateLog(ctx context.Context, logData *protoNode.LogData) (*protoNode.Empty, error) {
+	return &protoNode.Empty{}, nil
 }
 
 //aquí se aplica ricart y agrawala
-func CheckWriteProposal() {
+//writePermisions: Coordinación entre DataNodes para escribir en el log de NameNode
+func (*DataNode) WritePermisions(ctx context.Context, writeRequest *protoNode.WriteRequest) (*protoNode.Response, error) {
+	response := &protoNode.Response{}
+	return response, nil
+}
 
+//sendChunk: Envia el chunk a guardar
+func (*DataNode) RecieveChunk(ctx context.Context, chunkPackage *protoNode.ChunkPackage) (*protoNode.Empty, error) {
+	return &protoNode.Empty{}, nil
 }
