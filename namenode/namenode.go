@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/BSolarV/tarea2-sd-winducloveer/protoName"
-	protoNode "github.com/BSolarV/tarea2-sd-winducloveer/protoName"
+	"github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
 
 	"google.golang.org/grpc"
 )
 
 /*
 Definitivamente no compila! c:
-No tenia el protoNode y no sabia que más hacer C: */
+No tenia el protoName y no sabia que más hacer C: */
 
 //IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
@@ -89,9 +89,9 @@ func newNameNode() *NameNode {
 }
 
 //ClientRequest es invocada por el cliente para leer el log
-func (s *NameNode) ClientRequest(ctx context.Context, request *protoNode.ReadRequest) (*protoNode.LogData, error) {
+func (s *NameNode) ClientRequest(ctx context.Context, request *protoName.ReadRequest) (*protoName.LogData, error) {
 	s.mutex.Lock()
-	var paq *protoNode.LogData
+	var paq *protoName.LogData
 
 	//var aux [len(request.partsLocation]string
 	for _, book := range s.log {
@@ -100,7 +100,7 @@ func (s *NameNode) ClientRequest(ctx context.Context, request *protoNode.ReadReq
 			paq.NumParts = book.partsNum
 
 			for indx, node := range book.partsLocation {
-				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Chunk{Index: indx, Datanode: node})
+				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Part{Index: indx, Datanode: node})
 			}
 
 		}
@@ -110,12 +110,12 @@ func (s *NameNode) ClientRequest(ctx context.Context, request *protoNode.ReadReq
 }
 
 //WriteRequest es innecesaria al parecer
-func (s *NameNode) WriteRequest(ctx context.Context, request *protoNode.WriteRequest) (*protoNode.Response, error) {
+func (s *NameNode) WriteRequest(ctx context.Context, request *protoName.WriteRequest) (*protoName.Response, error) {
 	return nil, nil
 }
 
 //WriteLog se usa cuando el nodo reune permisos y escribe con esta funcion
-func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoNode.LogData) (*protoNode.Empty, error) {
+func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogData) (*protoName.Empty, error) {
 	s.mutex.Lock()
 	var book Book
 
@@ -130,13 +130,47 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoNode.LogDa
 
 	s.mutex.Unlock()
 
-	return &protoNode.Empty{}, nil
+	return &protoName.Empty{}, nil
 
 }
 
-//CheckProposal chequea propuestas
-func (s *NameNode) CheckProposal(ctx context.Context, proposal *protoNode.Proposal) (*protoNode.Response, error) {
+//DistributeProposal reparte la propuesta del datanode correspondiente
+func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.Proposal) (*protoName.Response, error) {
 	res := true
 
-	return &protoNode.Response{Timestamp: time.Now().Unix(), Response: res}, nil
+	//Se conecta a todos los nodos y pregunta
+	var validIndexes []int
+	var connections []*grpc.ClientConn
+	var service protoNode.ProtoServiceClient
+
+	// Estableciendo conexiones para proposal y enviar chunks
+	var conn *grpc.ClientConn
+	var err error
+	for i := 0; i < 3; i++ {
+		conn, err = grpc.Dial(IPDIRECTIONS[int64(i)]+":"+PORTS[int64(i)], grpc.WithInsecure())
+		if err != nil {
+			// No se añade su indice como uno valido
+			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
+			continue
+		}
+
+		service = protoNode.NewProtoServiceClient(conn)
+		_, err = service.HeartBeat(context.Background(), &protoNode.Empty{})
+		if err != nil {
+			// No se añade su indice como uno valido
+			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
+			continue
+		}
+
+		fmt.Printf("Indice: %d, estado: %s", i, conn.GetState())
+
+		validIndexes = append(validIndexes, i)
+		connections = append(connections, conn)
+	}
+	//Continuar aquí
+
+	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
+	return &protoName.Response{Timestamp: time.Now().Unix(), Response: res}, nil
 }

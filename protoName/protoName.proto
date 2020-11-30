@@ -7,10 +7,10 @@ package protoName;
 message LogData { 
     string bookName = 1;
     int64 numParts = 2;
-    repeated Chunk partsLocation = 3;
+    repeated Part partsLocation = 3;
 }
 
-message Chunk {
+message Part {
     int64 index = 1;
     int64 datanode = 2;
 }
@@ -37,6 +37,8 @@ message Proposal {
     int64 node = 2;
     int64 numChunks = 3;
     int64 timestamp = 4;
+    string bookName = 5;
+    repeated Chunk chunksPackage = 6;
 }
 
 
@@ -47,13 +49,21 @@ message Response {
     bool response = 3;
 }
 
+// Chunks Set
+
+message Chunk {
+    string fileName = 1; 
+    int64 numChunkActual = 2;
+    bytes chunk = 3;
+}
+
 message Empty {}
 
 service ProtoNameService {
     
     // Metodos NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
-    rpc CheckProposal(Proposal) returns (Response) {}
+    rpc DistributeProposal(Proposal) returns (Response) {}
         //Función para escribir el Log
     rpc WriteLog(LogData) returns (Empty) {}
 
