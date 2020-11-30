@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,44 +18,32 @@ import (
 Definitivamente no compila! c:
 No tenia el protoNode y no sabia que más hacer C: */
 
-const ipDatanode0 = "localhost"
-const ipDatanode1 = "localhost"
-const ipDatanode2 = "localhost"
+//IPDIRECTIONS son las direcciones Ip's
+var IPDIRECTIONS = map[int64]string{
+	0: "localhost",
+	1: "localhost",
+	2: "localhost",
+	3: "localhost",
+}
 
-const ipNamenode = "localhost"
+//PORTS son los puertos en los que esas direcciones ip's escuchan
+var PORTS = map[int64]string{
+	0: "9000",
+	1: "9001",
+	2: "9002",
+	3: "9003",
+}
 
 func main() {
 
-	reader := bufio.NewReader(os.Stdin)
+	//reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("Indice del presente DataNode (0, 1 o 2): ")
-	text, _ := reader.ReadString('\n')
-	text = strings.Replace(text, "\n", "", -1)
-	text = strings.Replace(text, "\r", "", -1)
-	index, err := strconv.Atoi(text)
-	if err != nil {
-		panic(err)
-	}
-
-	var ip, port string
-	switch index {
-	case 0:
-		ip = ipDatanode0
-		port = "9000"
-	case 1:
-		ip = ipDatanode1
-		port = "9001"
-	case 2:
-		ip = ipDatanode2
-		port = "9002"
-	default:
-		panic("No es un indice valido.")
-	}
 
 	//Iniciando proceso listen para datanode
-	lis, err := net.Listen("tcp", ip+":"+port)
+	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
 	if err != nil {
-		fmt.Print("Fail listening on " + ip + ":" + port + ".")
+		fmt.Print("Fail listening on " + IPDIRECTIONS[3] + ":" + PORTS[3] + ".")
 		panic(err)
 	}
 	defer lis.Close()
@@ -70,7 +54,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 
 	// ProtoLogistic.RegisterProtoLogisticServiceServer(grpcServer, srv)
-	protoName.RegisterProtoServiceServer(grpcServer, srv)
+	protoName.RegisterProtoNameServiceServer(grpcServer, srv)
 
 	// Montando servidor GRPC
 	if err := grpcServer.Serve(lis); err != nil {
@@ -83,9 +67,8 @@ func main() {
 type Book struct {
 	id            string
 	bookname      string
-	partsNum      string
-	partsLocation []string
-	timestamp     string
+	partsNum      int64
+	partsLocation map[int64]int64 // index -> node
 }
 
 //NameNode es el Server
@@ -109,23 +92,20 @@ func newNameNode() *NameNode {
 func (s *NameNode) ClientRequest(ctx context.Context, request *protoNode.ReadRequest) (*protoNode.LogData, error) {
 	s.mutex.Lock()
 	var paq *protoNode.LogData
-	aux := ""
-	msg := ""
+
+	//var aux [len(request.partsLocation]string
 	for _, book := range s.log {
 		if book.bookname == request.GetBookname() {
-			paq.Id = book.id
-			paq.Timestamp = book.timestamp
-			msg += book.bookname + ";" + book.partsNum + ";"
-			for _, part := range book.partsLocation {
-				aux += part + ","
+			paq.BookName = book.bookname
+			paq.NumParts = book.partsNum
+
+			for indx, node := range book.partsLocation {
+				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Chunk{Index: indx, Datanode: node})
 			}
+
 		}
 	}
 	s.mutex.Unlock()
-	msg += aux
-
-	paq.Message = msg[:len(msg)-1]
-
 	return paq, nil
 }
 
@@ -139,15 +119,12 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoNode.LogDa
 	s.mutex.Lock()
 	var book Book
 
-	aux := packageToWrite.GetMessage()
-	aux1 := strings.Split(aux, ";")
-	aux2 := strings.Split(aux1[2], ",")
+	book.bookname = packageToWrite.GetBookName()
+	book.partsNum = packageToWrite.GetNumParts()
 
-	book.id = packageToWrite.GetId()
-	book.bookname = aux1[0]
-	book.partsNum = aux1[1]
-	book.partsLocation = aux2
-	book.timestamp = time.Now().Format("2006.01.02 15:04:05")
+	for _, chunk := range packageToWrite.GetPartsLocation() {
+		book.partsLocation[chunk.GetIndex()] = chunk.GetDatanode()
+	}
 
 	s.log = append(s.log, book)
 
