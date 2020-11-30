@@ -15,11 +15,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-const ipDatanode0 = "localhost"
-const ipDatanode1 = "localhost"
-const ipDatanode2 = "localhost"
-
-const ipNamenode = "localhost"
+var IPDIRECTIONS = map[int64]string{
+	0: "localhost",
+	1: "localhost",
+	2: "localhost",
+}
+var PORTS = map[int64]string{
+	0: "9000",
+	1: "9001",
+	2: "9002",
+}
 
 func main() {
 	keep := make(chan bool)
@@ -96,23 +101,9 @@ func sendFile() {
 	if err != nil {
 		panic(err)
 	}
-	var ip, port string
-	switch index {
-	case 0:
-		ip = ipDatanode0
-		port = "9000"
-	case 1:
-		ip = ipDatanode1
-		port = "9001"
-	case 2:
-		ip = ipDatanode2
-		port = "9002"
-	default:
-		panic("No es un indice valido.")
-	}
 
 	var conn *grpc.ClientConn
-	conn, err = grpc.Dial(ip+":"+port, grpc.WithInsecure())
+	conn, err = grpc.Dial(IPDIRECTIONS[int64(index)]+":"+PORTS[int64(index)], grpc.WithInsecure())
 	if err != nil {
 		fmt.Print("Couldn't connect:")
 		panic(err)

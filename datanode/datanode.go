@@ -18,15 +18,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-/*
-Definitivamente no compila! c:
-No tenia el proto y no sabia que más hacer C: */
-
-const ipDatanode0 = "localhost"
-const ipDatanode1 = "localhost"
-const ipDatanode2 = "localhost"
-
-const ipNamenode = "localhost"
+var IPDIRECTIONS = map[int64]string{
+	0: "localhost",
+	1: "localhost",
+	2: "localhost",
+}
+var PORTS = map[int64]string{
+	0: "9000",
+	1: "9001",
+	2: "9002",
+}
 
 func main() {
 
@@ -41,25 +42,10 @@ func main() {
 		panic(err)
 	}
 
-	var ip, port string
-	switch index {
-	case 0:
-		ip = ipDatanode0
-		port = "9000"
-	case 1:
-		ip = ipDatanode1
-		port = "9001"
-	case 2:
-		ip = ipDatanode2
-		port = "9002"
-	default:
-		panic("No es un indice valido.")
-	}
-
 	//Iniciando proceso listen para datanode
-	lis, err := net.Listen("tcp", ip+":"+port)
+	lis, err := net.Listen("tcp", IPDIRECTIONS[int64(index)]+":"+PORTS[int64(index)])
 	if err != nil {
-		fmt.Print("Fail listening on " + ip + ":" + port + ".")
+		fmt.Print("Fail listening on " + IPDIRECTIONS[int64(index)] + ":" + PORTS[int64(index)] + ".")
 		panic(err)
 	}
 	defer lis.Close()
@@ -88,6 +74,8 @@ func main() {
 type DataNode struct {
 	index          int
 	availableSpace int
+	iWantToWrite   bool
+	sinceWhenIWant int64
 
 	proposalQueue        []string
 	writePermisionsQueue []string
@@ -101,6 +89,7 @@ func newDataNode(actualIndex int) *DataNode {
 	var srv DataNode
 	srv.index = actualIndex
 	srv.availableSpace = 1024 // espacio para chunks, 256 MegaBytes aproximadamente
+	srv.iWantToWrite = false
 	return &srv
 }
 
@@ -122,8 +111,24 @@ func (*DataNode) UpdateLog(ctx context.Context, logData *protoNode.LogData) (*pr
 
 //aquí se aplica ricart y agrawala
 //writePermisions: Coordinación entre DataNodes para escribir en el log de NameNode
-func (*DataNode) WritePermisions(ctx context.Context, writeRequest *protoNode.WriteRequest) (*protoNode.Response, error) {
-	response := &protoNode.Response{}
+func (srv *DataNode) WritePermisions(ctx context.Context, writeRequest *protoNode.WriteRequest) (*protoNode.Response, error) {
+	standBy := false
+	if srv.iWantToWrite && srv.sinceWhenIWant < writeRequest.Timestamp {
+		standBy = true
+	}
+	if standBy {
+		readyToRespond := make(chan bool)
+		go func() {
+			for {
+				if srv.iWantToWrite == false {
+					readyToRespond <- true
+					break
+				}
+			}
+		}()
+		<-readyToRespond
+	}
+	response := &protoNode.Response{Response: true}
 	return response, nil
 }
 
@@ -160,22 +165,11 @@ func (srv *DataNode) BuildProposal(validIndexes []int, connections []*grpc.Clien
 				availableDataNodes = validIndexes
 			}
 			index = rand.Intn(len(availableDataNodes))
-			fmt.Printf("Picked %d\n", index)
 			availableDataNodes[index] = availableDataNodes[len(availableDataNodes)-1]
 			availableDataNodes[len(availableDataNodes)-1] = 0
 			availableDataNodes = availableDataNodes[:len(availableDataNodes)-1]
-
-			fmt.Printf("Pickeeed %d\n", index)
 			proposal.dict[index] = append(proposal.dict[index], i)
 		}
-		fmt.Println("++++++++++++++++++++++++++++")
-		for key, value := range proposal.dict {
-			fmt.Printf("	datanode %d\n", key)
-			for i := 0; i < len(value); i++ {
-				fmt.Printf("		parte %d\n", value[i])
-			}
-		}
-		fmt.Println("++++++++++++++++++++++++++++")
 		var dataNodeService protoNode.ProtoServiceClient
 		for key, value := range proposal.dict {
 			dataNodeProposal = &protoNode.Proposal{Node: int64(srv.index), NumChunks: int64(len(value)), Timestamp: time.Now().Unix()}
@@ -206,9 +200,9 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 	var validIndexes []int
 	var connections []*grpc.ClientConn
+	var service protoNode.ProtoServiceClient
 
 	// Estableciendo conexiones para proposal y enviar chunks
-	var ip, port string
 	var conn *grpc.ClientConn
 	var err error
 	for i := 0; i < 3; i++ {
@@ -217,29 +211,31 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 			connections = append(connections, nil)
 			continue
 		}
-		switch i {
-		case 0:
-			ip = ipDatanode0
-			port = "9000"
-		case 1:
-			ip = ipDatanode1
-			port = "9001"
-		case 2:
-			ip = ipDatanode2
-			port = "9002"
-		}
 
-		conn, err = grpc.Dial(ip+":"+port, grpc.WithInsecure())
+		conn, err = grpc.Dial(IPDIRECTIONS[int64(i)]+":"+PORTS[int64(i)], grpc.WithInsecure())
 		if err != nil {
 			// No se añade su indice como uno valido
 			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
 			continue
 		}
+
+		service = protoNode.NewProtoServiceClient(conn)
+		_, err = service.HeartBeat(context.Background(), &protoNode.Empty{})
+		if err != nil {
+			// No se añade su indice como uno valido
+			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
+			continue
+		}
+
+		fmt.Printf("Indice: %d, estado: %s", i, conn.GetState())
 
 		validIndexes = append(validIndexes, i)
 		connections = append(connections, conn)
 	}
 
+	fmt.Printf("%x\n", validIndexes)
 	var dataNodeService protoNode.ProtoServiceClient
 	var proposal Proposal
 
@@ -260,12 +256,10 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 		for key, value := range proposal.dict {
 
-			fmt.Printf("Seding to %d\n", key)
 			chunks = chunks[:0]
 
 			for i := 0; i < len(value); i++ {
 				chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(value[i]), Chunk: splittedFile.Chunks[value[i]]})
-				fmt.Printf("	added chunk n: %d\n", chunks[i].NumChunkActual)
 			}
 			chunksToSend = &protoNode.ChunksPackage{BookName: splittedFile.Name, Chunks: chunks}
 
@@ -273,13 +267,6 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 				_, err = srv.RecieveChunks(context.Background(), chunksToSend)
 			} else {
 				dataNodeService = protoNode.NewProtoServiceClient(connections[key])
-				fmt.Println("-----------------------")
-				asdf, fdsa := dataNodeService.PrintIndex(context.Background(), &protoNode.Empty{})
-				if fdsa != nil {
-					panic(fdsa)
-				}
-				fmt.Printf("sended to: %s\n", asdf.Id)
-				fmt.Println("-----------------------")
 				_, err = dataNodeService.RecieveChunks(context.Background(), chunksToSend)
 			}
 
@@ -287,15 +274,19 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 				flag = false
 				break
 			}
-			fmt.Printf("DONE WITH DATANODE: %d!!!!!!!!\n", key)
 		}
 	}
-	for index, connection := range connections {
-		fmt.Printf("Closing %d\n", index)
+
+	// RICART & AGRAWALA
+	srv.iWantToWrite = true
+	srv.sinceWhenIWant = time.Now().Unix()
+
+	srv.iWantToWrite = false
+
+	for _, connection := range connections {
 		if connection == nil {
 			continue
 		}
-		fmt.Printf("Esta así: %d\n", connection.GetState())
 		connection.Close()
 	}
 	return &protoNode.Empty{}, nil
@@ -304,4 +295,8 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 func (srv *DataNode) PrintIndex(ctx context.Context, _ *protoNode.Empty) (*protoNode.Response, error) {
 	fmt.Printf("Soy el indice %d\n", srv.index)
 	return &protoNode.Response{Id: strconv.Itoa(srv.index)}, nil
+}
+
+func (*DataNode) HeartBeat(ctx context.Context, Empty *protoNode.Empty) (*protoNode.Empty, error) {
+	return &protoNode.Empty{}, nil
 }

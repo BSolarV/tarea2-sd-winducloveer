@@ -64,6 +64,7 @@ message Empty {}
 
 service ProtoService {
     rpc PrintIndex(Empty) returns (Response) {}
+    rpc HeartBeat(Empty) returns (Empty) {}
     // Metodos entre Datanodes
         // Envia el chunk a guardar
     rpc RecieveChunks(ChunksPackage) returns (Empty) {}
