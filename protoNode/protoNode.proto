@@ -11,7 +11,7 @@ message SplittedFile {
 message LogData { 
     string id = 1;
     string message = 2;
-    string timestamp = 3; 
+    int64 timestamp = 3; 
 }
 
 // Quiero leer el log (se lo envio a todos)
@@ -19,7 +19,7 @@ message ReadRequest {
     string id = 1;
     int64 node = 2;
     string bookname = 3; 
-    string timestamp = 4; 
+    int64 timestamp = 4; 
 }
 
 
@@ -27,43 +27,46 @@ message ReadRequest {
 message WriteRequest {
     string id = 1;
     int64 node = 2;
-    string timestamp = 3; 
+    int64 timestamp = 3; 
 }
 
 
 // Enviamos una propuesta al nodo (al nodo que recibe el msg)
-message Proporsal {
+message Proposal {
     string id = 1;
     int64 node = 2;
     int64 numChunks = 3;
-    string timestamp = 4;
+    int64 timestamp = 4;
 }
 
 
 // 1 = apruebo  0 = rechazo
 message Response {
     string id = 1;
-    string timestamp = 2;
+    int64 timestamp = 2;
     bool response = 3;
 }
 
 
-// Chunk
-message ChunkPackage {
+// Chunks Set
+message ChunksPackage {
     string id = 1;
     string bookName = 2;
-    int64 numChunkTotal = 3; 
-    int64 numChunkActual = 4;
-    bytes chunk = 5;
+    repeated Chunk Chunks = 3; 
+}
+message Chunk {
+    string fileName = 1; 
+    int64 numChunkActual = 2;
+    bytes chunk = 3;
 }
 
 message Empty {}
 
 service ProtoService {
-
+    rpc PrintIndex(Empty) returns (Response) {}
     // Metodos entre Datanodes
         // Envia el chunk a guardar
-    rpc RecieveChunk(ChunkPackage) returns (Empty) {}
+    rpc RecieveChunks(ChunksPackage) returns (Empty) {}
         // Coordinación entre DataNodes para escribir en el log de NameNode 
     rpc WritePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
 
@@ -73,7 +76,7 @@ service ProtoService {
 
     // Metodos DataNode-DataNode y NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
-    rpc CheckProporsal(Proporsal) returns (Response) {}
+    rpc CheckProposal(Proposal) returns (Response) {}
 
     // Metodos cliente-DataNode
         // Subir un archivo chunkeado
