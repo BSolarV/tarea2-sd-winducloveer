@@ -37,8 +37,6 @@ message Proposal {
     int64 node = 2;
     int64 numChunks = 3;
     int64 timestamp = 4;
-    string bookName = 5;
-    repeated Chunk chunksPackage = 6;
 }
 
 
@@ -49,13 +47,6 @@ message Response {
     bool response = 3;
 }
 
-// Chunks Set
-
-message Chunk {
-    string fileName = 1; 
-    int64 numChunkActual = 2;
-    bytes chunk = 3;
-}
 
 message Empty {}
 

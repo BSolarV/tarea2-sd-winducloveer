@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	protoNode "github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
+	"github.com/BSolarV/tarea2-sd-winducloveer/protoName"
+	"github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
 
 	"google.golang.org/grpc"
 )
@@ -22,15 +23,14 @@ var IPDIRECTIONS = map[int64]string{
 	0: "localhost",
 	1: "localhost",
 	2: "localhost",
+	3: "localhost",
 }
 var PORTS = map[int64]string{
 	0: "9000",
 	1: "9001",
 	2: "9002",
+	3: "9003",
 }
-
-const ipNameNode = "localhost"
-const portNameNode = "9003"
 
 func main() {
 
@@ -309,6 +309,25 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 			}()
 			<-done
 			fmt.Println("Yes")
+			con, err := grpc.Dial(IPDIRECTIONS[3]+":"+PORTS[3], grpc.WithInsecure())
+			if err != nil {
+				fmt.Printf("ERROR! %s\n", err)
+			}
+
+			nameNodeService := protoName.NewProtoNameServiceClient(con)
+
+			var sendToWrite *protoName.LogData
+
+			sendToWrite.BookName = splittedFile.Name
+			sendToWrite.NumParts = int64(len(splittedFile.Chunks))
+
+			for nod, chnklist := range proposal.dict {
+				for _, chnk := range chnklist {
+					sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), Datanode: int64(nod)})
+				}
+			}
+
+			_, err = nameNodeService.WriteLog(context.Background(), sendToWrite)
 		}
 	}
 
