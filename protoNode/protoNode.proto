@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package protoNode;
 
+message SplittedFile {
+    string name = 1;
+    repeated bytes chunks = 2;
+}
+
 // Para leer/escribir en el log 
 message LogData { 
     string id = 1;
@@ -69,10 +74,13 @@ service ProtoService {
     // Metodos DataNode-DataNode y NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
     rpc CheckProporsal(Proporsal) returns (Response) {}
+
+    // Metodos cliente-DataNode
+        // Subir un archivo chunkeado
+    rpc UploadFile(SplittedFile) returns (Empty) {}
 }
 
 option go_package = "github.com/BSolarV/tarea2-sd-winducloveer/protoNode";
-
 
 // Pa compilar
 // protoc --go_opt=paths=source_relative --go_out=plugins=grpc:. .\protoNode\protoNode.proto

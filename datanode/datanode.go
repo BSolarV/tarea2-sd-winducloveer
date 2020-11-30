@@ -77,7 +77,7 @@ func main() {
 
 }
 
-// DataNode debe implementar:
+// DataNode debe modificar los metodos que utilice:
 //	sendChunk(ChunkPackage) returns (Empty) {}
 //	writePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
 //	updateLog(LogData) returns (Empty) {}
@@ -123,5 +123,10 @@ func (*DataNode) WritePermisions(ctx context.Context, writeRequest *protoNode.Wr
 
 //sendChunk: Envia el chunk a guardar
 func (*DataNode) RecieveChunk(ctx context.Context, chunkPackage *protoNode.ChunkPackage) (*protoNode.Empty, error) {
+	return &protoNode.Empty{}, nil
+}
+
+func (*DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.SplittedFile) (*protoNode.Empty, error) {
+	fmt.Printf("%s: %x", splittedFile.Name, splittedFile.Chunks[:5][:5])
 	return &protoNode.Empty{}, nil
 }

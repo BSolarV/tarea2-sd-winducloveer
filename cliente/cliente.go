@@ -4,74 +4,144 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"strconv"
+	"strings"
+
+	"github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
+	"google.golang.org/grpc"
 )
 
-func main() {
+const ipDatanode0 = "localhost"
+const ipDatanode1 = "localhost"
+const ipDatanode2 = "localhost"
 
-	fileToBeChunked := "./bigfile.zip" // change here!
+const ipNamenode = "localhost"
+
+func main() {
+	keep := make(chan bool)
+	go func() {
+		for {
+			reader := bufio.NewReader(os.Stdin)
+
+			fmt.Print("Ingresar un libro? ")
+			text, _ := reader.ReadString('\n')
+			text = strings.Replace(text, "\n", "", -1)
+			text = strings.Replace(text, "\r", "", -1)
+			if text == "no" {
+				keep <- true
+			}
+			sendFile()
+		}
+	}()
+	<-keep
+}
+
+func sendFile() {
+	const FILECHUNK = 256000 // 1 MB, change this to your requirement
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Ingrese el nombre del libro: ")
+	text, _ := reader.ReadString('\n')
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
+	name := text
+	fmt.Printf("Nombre del libro: %s.\n", name)
+	fmt.Print("Ingrese el nombre del archivo a subir: ")
+	text, _ = reader.ReadString('\n')
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
+	fileToBeChunked := text
 
 	file, err := os.Open(fileToBeChunked)
-
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
 	defer file.Close()
 
 	fileInfo, _ := file.Stat()
 
 	var fileSize int64 = fileInfo.Size()
 
-	const fileChunk = 1 * (1 << 20) // 1 MB, change this to your requirement
-
 	// calculate total number of parts the file will be chunked into
 
-	totalPartsNum := uint64(math.Ceil(float64(fileSize) / float64(fileChunk)))
+	totalPartsNum := uint64(math.Ceil(float64(fileSize) / float64(FILECHUNK)))
 
 	fmt.Printf("Splitting to %d pieces.\n", totalPartsNum)
 
+	var listOfChunks [][]byte
+
 	for i := uint64(0); i < totalPartsNum; i++ {
 
-		partSize := int(math.Min(fileChunk, float64(fileSize-int64(i*fileChunk))))
+		partSize := int(math.Min(FILECHUNK, float64(fileSize-int64(i*FILECHUNK))))
 		partBuffer := make([]byte, partSize)
 
 		file.Read(partBuffer)
 
-		// write to disk
-		fileName := "bigfile_" + strconv.FormatUint(i, 10)
-		_, err := os.Create(fileName)
+		fmt.Printf("	%d piece: %x\n", i, partBuffer[:5])
+		listOfChunks = append(listOfChunks, partBuffer)
+	}
+	fmt.Printf("Splitted to %d pieces.\n", len(listOfChunks))
 
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// write/save buffer to disk
-		ioutil.WriteFile(fileName, partBuffer, os.ModeAppend)
-
-		fmt.Println("Split to : ", fileName)
+	fmt.Print("Ingrese a que DataNode subir (0, 1 o 2): ")
+	text, _ = reader.ReadString('\n')
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
+	index, err := strconv.Atoi(text)
+	if err != nil {
+		panic(err)
+	}
+	var ip, port string
+	switch index {
+	case 0:
+		ip = ipDatanode0
+		port = "9000"
+	case 1:
+		ip = ipDatanode1
+		port = "9001"
+	case 2:
+		ip = ipDatanode2
+		port = "9002"
+	default:
+		panic("No es un indice valido.")
 	}
 
+	var conn *grpc.ClientConn
+	conn, err = grpc.Dial(ip+":"+port, grpc.WithInsecure())
+	if err != nil {
+		fmt.Print("Couldn't connect:")
+		panic(err)
+	}
+	defer conn.Close()
+	dataNodeService := protoNode.NewProtoServiceClient(conn)
+	splittedFile := &protoNode.SplittedFile{Name: name, Chunks: listOfChunks}
+	_, err = dataNodeService.UploadFile(context.Background(), splittedFile)
+	if err != nil {
+		fmt.Printf("Couldn't connect: %s", err)
+	}
+
+}
+
+func rebuildFile(totalPartsNum uint64) {
 	// just for fun, let's recombine back the chunked files in a new file
 
 	newFileName := "NEWbigfile.zip"
-	_, err = os.Create(newFileName)
+	_, er := os.Create(newFileName)
 
-	if err != nil {
-		fmt.Println(err)
+	if er != nil {
+		fmt.Println(er)
 		os.Exit(1)
 	}
 
 	//set the newFileName file to APPEND MODE!!
 	// open files r and w
 
-	file, err = os.OpenFile(newFileName, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	file, err := os.OpenFile(newFileName, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 
 	if err != nil {
 		fmt.Println(err)
@@ -150,5 +220,4 @@ func main() {
 
 	// now, we close the newFileName
 	file.Close()
-
 }
