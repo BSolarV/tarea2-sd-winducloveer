@@ -70,10 +70,6 @@ service ProtoService {
         // Coordinación entre DataNodes para escribir en el log de NameNode 
     rpc WritePermisions(WriteRequest) returns (Response) {}  // Ricart & Agrawala
 
-    // Metodos NameNode-DataNode
-        // Escritura de DataNode en NameNode
-    rpc UpdateLog(LogData) returns (Empty) {}
-
     // Metodos DataNode-DataNode y NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
     rpc CheckProposal(Proposal) returns (Response) {}

@@ -141,7 +141,7 @@ type Proposal struct {
 
 // Usaremos bully algorithm de https://moodle.inf.utfsm.cl/pluginfile.php/104700/mod_resource/content/0/Chapter%204_clase3.pdf
 // Creo que no hace falta el bully, mejor random, porque no se puede pasar el mando, la propuesta y envio de chunks debe hacerlo el mismo datanode que los recibio
-func (srv *DataNode) BuildProposal(validIndexes []int, services []protoNode.ProtoServiceClient, numOfChunks int) (Proposal, error) {
+func (srv *DataNode) BuildProposal(validIndexes []int, connections []*grpc.ClientConn, numOfChunks int) (Proposal, error) {
 	proposal := Proposal{dict: make(map[int][]int)}
 	var index int
 	var availableDataNodes []int
@@ -182,7 +182,7 @@ func (srv *DataNode) BuildProposal(validIndexes []int, services []protoNode.Prot
 			if key == srv.index {
 				response, err = srv.CheckProposal(context.Background(), dataNodeProposal)
 			} else {
-				dataNodeService = services[key]
+				dataNodeService = protoNode.NewProtoServiceClient(connections[key])
 				response, err = dataNodeService.CheckProposal(context.Background(), dataNodeProposal)
 			}
 			if err != nil || !response.Response {
@@ -206,18 +206,15 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 	var validIndexes []int
 	var connections []*grpc.ClientConn
-	var services []protoNode.ProtoServiceClient
 
 	// Estableciendo conexiones para proposal y enviar chunks
 	var ip, port string
 	var conn *grpc.ClientConn
-	var dataNodeService protoNode.ProtoServiceClient
 	var err error
 	for i := 0; i < 3; i++ {
 		if i == srv.index {
 			validIndexes = append(validIndexes, i)
 			connections = append(connections, nil)
-			services = append(services, nil)
 			continue
 		}
 		switch i {
@@ -236,26 +233,14 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 		if err != nil {
 			// No se añade su indice como uno valido
 			connections = append(connections, nil)
-			services = append(services, nil)
 			continue
 		}
 
 		validIndexes = append(validIndexes, i)
 		connections = append(connections, conn)
-		dataNodeService = protoNode.NewProtoServiceClient(conn)
-		services = append(services, dataNodeService)
 	}
 
-	fmt.Println("-----------------------")
-	for _, service := range services {
-		asdf, fdsa := service.PrintIndex(context.Background(), &protoNode.Empty{})
-		if fdsa != nil {
-			panic(fdsa)
-		}
-		fmt.Printf("Recieved: %s\n", asdf.Id)
-	}
-	fmt.Println("-----------------------")
-
+	var dataNodeService protoNode.ProtoServiceClient
 	var proposal Proposal
 
 	var chunks []*protoNode.Chunk
@@ -266,7 +251,7 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 		flag = true
 
-		proposal, err = srv.BuildProposal(validIndexes, services, len(splittedFile.Chunks))
+		proposal, err = srv.BuildProposal(validIndexes, connections, len(splittedFile.Chunks))
 		if err != nil {
 			flag = false
 			fmt.Printf("ERROR! %s\n", err)
@@ -275,26 +260,42 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 		for key, value := range proposal.dict {
 
-			chunks = make([]*protoNode.Chunk, len(value))
+			fmt.Printf("Seding to %d\n", key)
+			chunks = chunks[:0]
 
 			for i := 0; i < len(value); i++ {
-				chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(i), Chunk: splittedFile.Chunks[value[i]]})
+				chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(value[i]), Chunk: splittedFile.Chunks[value[i]]})
+				fmt.Printf("	added chunk n: %d\n", chunks[i].NumChunkActual)
 			}
 			chunksToSend = &protoNode.ChunksPackage{BookName: splittedFile.Name, Chunks: chunks}
 
 			if key == srv.index {
 				_, err = srv.RecieveChunks(context.Background(), chunksToSend)
 			} else {
-				_, err = services[key].RecieveChunks(context.Background(), chunksToSend)
+				dataNodeService = protoNode.NewProtoServiceClient(connections[key])
+				fmt.Println("-----------------------")
+				asdf, fdsa := dataNodeService.PrintIndex(context.Background(), &protoNode.Empty{})
+				if fdsa != nil {
+					panic(fdsa)
+				}
+				fmt.Printf("sended to: %s\n", asdf.Id)
+				fmt.Println("-----------------------")
+				_, err = dataNodeService.RecieveChunks(context.Background(), chunksToSend)
 			}
 
 			if err != nil {
 				flag = false
 				break
 			}
+			fmt.Printf("DONE WITH DATANODE: %d!!!!!!!!\n", key)
 		}
 	}
-	for _, connection := range connections {
+	for index, connection := range connections {
+		fmt.Printf("Closing %d\n", index)
+		if connection == nil {
+			continue
+		}
+		fmt.Printf("Esta así: %d\n", connection.GetState())
 		connection.Close()
 	}
 	return &protoNode.Empty{}, nil

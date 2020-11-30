@@ -5,9 +5,14 @@ package protoName;
 
 // Para leer/escribir en el log 
 message LogData { 
-    string id = 1;
-    string message = 2;
-    int64 timestamp = 3; 
+    string bookName = 1;
+    int64 numParts = 2;
+    repeated Chunk partsLocation = 3;
+}
+
+message Chunk {
+    int64 index = 1;
+    int64 datanode = 2;
 }
 
 // Quiero leer el log (se lo envio a todos)
@@ -17,7 +22,6 @@ message ReadRequest {
     string bookname = 3; 
     int64 timestamp = 4; 
 }
-
 
 // Quiero escribir el log (se lo envio a todos)
 message WriteRequest {
@@ -45,12 +49,12 @@ message Response {
 
 message Empty {}
 
-service ProtoService {
+service ProtoNameService {
     
     // Metodos NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
     rpc CheckProposal(Proposal) returns (Response) {}
-        //Función para sobreeescribir el Log
+        //Función para escribir el Log
     rpc WriteLog(LogData) returns (Empty) {}
 
     // Metodos cliente-NameNode
