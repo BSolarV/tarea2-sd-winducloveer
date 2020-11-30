@@ -29,6 +29,9 @@ var PORTS = map[int64]string{
 	2: "9002",
 }
 
+const ipNameNode = "localhost"
+const portNameNode = "9003"
+
 func main() {
 
 	reader := bufio.NewReader(os.Stdin)
@@ -112,6 +115,7 @@ func (*DataNode) UpdateLog(ctx context.Context, logData *protoNode.LogData) (*pr
 //aquí se aplica ricart y agrawala
 //writePermisions: Coordinación entre DataNodes para escribir en el log de NameNode
 func (srv *DataNode) WritePermisions(ctx context.Context, writeRequest *protoNode.WriteRequest) (*protoNode.Response, error) {
+	time.Sleep(5 * time.Second)
 	standBy := false
 	if srv.iWantToWrite && srv.sinceWhenIWant < writeRequest.Timestamp {
 		standBy = true
@@ -242,12 +246,15 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 	var chunks []*protoNode.Chunk
 	var chunksToSend *protoNode.ChunksPackage
 
+	tempValidIndexes := make([]int, len(validIndexes))
 	flag := false
 	for flag == false {
 
 		flag = true
 
-		proposal, err = srv.BuildProposal(validIndexes, connections, len(splittedFile.Chunks))
+		_ = copy(tempValidIndexes, validIndexes)
+		fmt.Printf("%x\n", tempValidIndexes)
+		proposal, err = srv.BuildProposal(tempValidIndexes, connections, len(splittedFile.Chunks))
 		if err != nil {
 			flag = false
 			fmt.Printf("ERROR! %s\n", err)
@@ -278,8 +285,32 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 	}
 
 	// RICART & AGRAWALA
+	fmt.Println("Beginning Ricart")
 	srv.iWantToWrite = true
 	srv.sinceWhenIWant = time.Now().Unix()
+
+	for _, index := range tempValidIndexes {
+		if index != srv.index {
+			conn = connections[index]
+			done := make(chan bool)
+			counter := 0
+			go func() {
+				dataNodeService = protoNode.NewProtoServiceClient(conn)
+				fmt.Printf("Asking %d\n", index)
+				_, err = dataNodeService.WritePermisions(context.Background(), &protoNode.WriteRequest{Node: int64(srv.index), Timestamp: srv.sinceWhenIWant})
+				if err != nil {
+					fmt.Printf("ERROR! %s\n", err)
+				}
+				fmt.Printf("Recieved Response from %d\n", index)
+				counter += 1
+				if counter == len(tempValidIndexes)-1 {
+					done <- true
+				}
+			}()
+			<-done
+			fmt.Println("Yes")
+		}
+	}
 
 	srv.iWantToWrite = false
 
