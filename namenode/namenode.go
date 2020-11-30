@@ -118,6 +118,7 @@ func (s *NameNode) WriteRequest(ctx context.Context, request *protoName.WriteReq
 func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogData) (*protoName.Empty, error) {
 	s.mutex.Lock()
 	var book Book
+	fmt.Println("Writing Log")
 
 	book.bookname = packageToWrite.GetBookName()
 	book.partsNum = packageToWrite.GetNumParts()
@@ -127,6 +128,14 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	}
 
 	s.log = append(s.log, book)
+	fmt.Println("LOG")
+	for _, i := range s.log {
+		fmt.Printf("%s: ", i.bookname)
+		fmt.Printf("   %d:  ", i.partsNum)
+		fmt.Printf("   %x: ", i.partsLocation)
+		fmt.Println("---------------------------")
+	}
+	fmt.Println("")
 
 	s.mutex.Unlock()
 
