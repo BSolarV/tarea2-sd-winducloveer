@@ -310,7 +310,6 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 					fmt.Printf("ERROR! %s\n", err)
 				}
 				fmt.Printf("Recieved Response from %d\n", index)
-				counter += 1
 				done <- true
 			}(index)
 		}

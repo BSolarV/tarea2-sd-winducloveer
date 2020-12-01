@@ -1,6 +1,6 @@
 OrgulloYPrejuicio 5
-Parte: 0IpMaquina: localhost:9002
-Parte: 3IpMaquina: localhost:9002
-Parte: 1IpMaquina: localhost:9001
-Parte: 4IpMaquina: localhost:9001
-Parte: 2IpMaquina: localhost:9000
+OrgulloYPrejuicio_0	localhost:9001
+OrgulloYPrejuicio_1	localhost:9000
+OrgulloYPrejuicio_2	localhost:9001
+OrgulloYPrejuicio_3	localhost:9000
+OrgulloYPrejuicio_4	localhost:9001

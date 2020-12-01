@@ -160,7 +160,7 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	}
 	sort.Ints(keys)
 	for _, key := range keys {
-		stringToWrite += strconv.Itoa(int(key)) + "	" + book.partsLocation[int64(key)] + "\n"
+		stringToWrite += book.bookname + "_" + strconv.Itoa(int(key)) + "	" + book.partsLocation[int64(key)] + "\n"
 	}
 
 	_, err = file.WriteString(stringToWrite)
