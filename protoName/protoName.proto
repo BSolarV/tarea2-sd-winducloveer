@@ -12,7 +12,8 @@ message LogData {
 
 message Part {
     int64 index = 1;
-    int64 datanode = 2;
+    string ipPuertoDatanode = 2;
+    
 }
 
 // Quiero leer el log (se lo envio a todos)
