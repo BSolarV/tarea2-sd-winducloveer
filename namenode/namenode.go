@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"sort"
@@ -64,6 +65,10 @@ func main() {
 
 }
 
+type Proposal struct {
+	dict map[int][]int // mapa de indice DataNode a indices de Chunks a enviar a dicho dataNode
+}
+
 //Book es la estructura de Libro
 type Book struct {
 	id            string
@@ -77,7 +82,6 @@ type NameNode struct {
 
 	//el log es el registro de los libros
 	log []Book
-
 	// Para bloquear recursos entre hilos
 	mutex sync.Mutex
 }
@@ -172,10 +176,14 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 }
 
 //DistributeProposal reparte la propuesta del datanode correspondiente
-func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.ProposalToNameNode) (*protoName.Response, error) {
-	res := true
-
+func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.ProposalToNameNode) (*protoName.Response, error) {
 	iteration := 0
+
+	proposal := Proposal{dict: make(map[int][]int)}
+	var index int
+	var availableDataNodes []int
+	var response *protoNode.Response
+	var dataNodeProposal *protoNode.Proposal
 
 	//Se conecta a todos los nodos y pregunta
 	var validIndexes []int
@@ -211,37 +219,52 @@ func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.P
 	//Enviar a cada nodo la propuesta
 	agreement := false
 
-	var tempProposal *protoNode.Proposal
-
 	for !agreement {
 		agreement = true
-		for _, con := range connections {
-			dataNodeService := protoNode.NewProtoServiceClient(con)
-			ind, _ := dataNodeService.PrintIndex(context.Background(), &protoNode.Empty{})
 
-			//tempProposal se traspasa si es la 1era iteracion
-			if iteration == 0 {
-				aux, _ := strconv.Atoi(ind.GetId())
-				tempProposal.Node = int64(aux)
-				tempProposal.NumChunks = proposal.NodesRepart[aux]
-			} else {
-
+		//Generar propuesta
+		if iteration != 0 {
+			availableDataNodes = validIndexes
+			for i := 0; i < int(propose.NumChunks); i++ {
+				if len(availableDataNodes) == 0 {
+					availableDataNodes = validIndexes
+				}
+				index = rand.Intn(len(availableDataNodes))
+				availableDataNodes[index] = availableDataNodes[len(availableDataNodes)-1]
+				availableDataNodes[len(availableDataNodes)-1] = 0
+				availableDataNodes = availableDataNodes[:len(availableDataNodes)-1]
+				proposal.dict[index] = append(proposal.dict[index], i)
 			}
-			response, _ := dataNodeService.CheckProposal(context.Background(), tempProposal)
-			if response.Response == false {
+		} else { //Pasar la 1era propuesta al proposal.dict
+			for _, chnk := range propose.ChunksNode1 {
+				proposal.dict[0] = append(proposal.dict[0], int(chnk))
+			}
+			for _, chnk := range propose.ChunksNode2 {
+				proposal.dict[1] = append(proposal.dict[0], int(chnk))
+			}
+			for _, chnk := range propose.ChunksNode3 {
+				proposal.dict[2] = append(proposal.dict[0], int(chnk))
+			}
+		}
+		var dataNodeService protoNode.ProtoServiceClient
+		for key, value := range proposal.dict {
+			dataNodeProposal = &protoNode.Proposal{Node: int64(3), NumChunks: int64(len(value)), Timestamp: time.Now().Unix()}
+			dataNodeService = protoNode.NewProtoServiceClient(connections[key])
+			response, err = dataNodeService.CheckProposal(context.Background(), dataNodeProposal)
+
+			if err != nil || !response.Response {
+				validIndexes[key] = validIndexes[len(validIndexes)-1]
+				validIndexes[len(validIndexes)-1] = 0
+				validIndexes = validIndexes[:len(validIndexes)-1]
 				agreement = false
-				iteration++
 				continue
 			}
-			iteration++
 		}
 
 	}
 
-	//finaliza
-
 	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
-	return &protoName.Response{Timestamp: time.Now().Unix(), Response: res}, nil
+	return &protoName.Response{Timestamp: time.Now().Unix(), Response: agreement}, nil
 }
 
 func (s *NameNode) GetBooks(ctx context.Context, empty *protoName.Empty) (*protoName.EveryBook, error) {
@@ -250,8 +273,4 @@ func (s *NameNode) GetBooks(ctx context.Context, empty *protoName.Empty) (*proto
 		books = append(books, book.bookname)
 	}
 	return &protoName.EveryBook{Books: books}, nil
-}
-
-func GenerateProposal(validIndexes []int, numChunks int) {
-
 }

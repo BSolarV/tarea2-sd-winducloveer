@@ -43,9 +43,11 @@ message Proposal {
 //Nodes repart contiene el nro de nodos por cada datanode  EJ: [6,5,1] -> 6 irían al datanode 0
 message ProposalToNameNode {
     string id = 1;
-    repeated int64 nodesRepart = 2;
-    int64 numChunks = 3;
-    int64 timestamp = 4;
+    repeated int64 chunksNode1 = 2;
+    repeated int64 chunksNode2 = 3;
+    repeated int64 chunksNode3 = 4;
+    int64 numChunks = 5;
+    int64 timestamp = 6;
 }
 
 
