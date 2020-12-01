@@ -40,6 +40,14 @@ message Proposal {
     int64 timestamp = 4;
 }
 
+//Nodes repart contiene el nro de nodos por cada datanode  EJ: [6,5,1] -> 6 irían al datanode 0
+message ProposalToNameNode {
+    string id = 1;
+    repeated int64 nodesRepart = 2;
+    int64 numChunks = 3;
+    int64 timestamp = 4;
+}
+
 
 // 1 = apruebo  0 = rechazo
 message Response {

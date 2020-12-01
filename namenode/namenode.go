@@ -16,6 +16,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+/*
+Definitivamente no compila! c:
+No tenia el protoName y no sabia que más hacer C: */
+
 //IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
 	0: "localhost",
@@ -34,15 +38,16 @@ var PORTS = map[int64]string{
 
 func main() {
 
+	//reader := bufio.NewReader(os.Stdin)
+
 	//Iniciando proceso listen para Namenode
-	fmt.Println("beggin")
 	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
 	if err != nil {
 		fmt.Print("Fail listening on " + IPDIRECTIONS[3] + ":" + PORTS[3] + ".")
 		panic(err)
 	}
 	defer lis.Close()
-	fmt.Println("listen")
+
 	// Creando instancia del nodo
 	srv := newNameNode()
 	// creando instancia de servidor GRPC
@@ -50,14 +55,12 @@ func main() {
 
 	// ProtoLogistic.RegisterProtoLogisticServiceServer(grpcServer, srv)
 	protoName.RegisterProtoNameServiceServer(grpcServer, srv)
-	fmt.Println("service on")
 
 	// Montando servidor GRPC
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to mount GRPC server on port 9000: %v", err)
 	}
 
-	fmt.Println("Mounted")
 }
 
 //Book es la estructura de Libro
@@ -158,7 +161,7 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 }
 
 //DistributeProposal reparte la propuesta del datanode correspondiente
-func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.Proposal) (*protoName.Response, error) {
+func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.ProposalToNameNode) (*protoName.Response, error) {
 	res := true
 
 	//Se conecta a todos los nodos y pregunta
@@ -192,7 +195,21 @@ func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.P
 		validIndexes = append(validIndexes, i)
 		connections = append(connections, conn)
 	}
-	//Continuar aquí
+	//Enviar a cada nodo la propuesta
+	agreement := false
+	for !agreement {
+		var props *protoNode.Proposal
+		props.Node = 3
+		props.NumChunks = 
+		agreement = true
+		for _, con := range connections {
+			dataNodeService := protoNode.NewProtoServiceClient(con)
+			ind, err = dataNodeService.PrintIndex()
+		}
+	}
+
+
+	//finaliza
 
 	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
 	return &protoName.Response{Timestamp: time.Now().Unix(), Response: res}, nil
