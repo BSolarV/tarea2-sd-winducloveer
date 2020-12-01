@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -38,9 +40,8 @@ func main() {
 
 	//reader := bufio.NewReader(os.Stdin)
 
-	fmt.Print("Indice del presente DataNode (0, 1 o 2): ")
 
-	//Iniciando proceso listen para datanode
+	//Iniciando proceso listen para Namenode
 	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
 	if err != nil {
 		fmt.Print("Fail listening on " + IPDIRECTIONS[3] + ":" + PORTS[3] + ".")
@@ -68,7 +69,7 @@ type Book struct {
 	id            string
 	bookname      string
 	partsNum      int64
-	partsLocation map[int64]int64 // index -> node
+	partsLocation map[int64]string // index -> node
 }
 
 //NameNode es el Server
@@ -100,7 +101,7 @@ func (s *NameNode) ClientRequest(ctx context.Context, request *protoName.ReadReq
 			paq.NumParts = book.partsNum
 
 			for indx, node := range book.partsLocation {
-				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Part{Index: indx, Datanode: node})
+				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Part{Index: indx, IpPuertoDatanode: node})
 			}
 
 		}
@@ -118,15 +119,38 @@ func (s *NameNode) WriteRequest(ctx context.Context, request *protoName.WriteReq
 func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogData) (*protoName.Empty, error) {
 	s.mutex.Lock()
 	var book Book
+	fmt.Println("Writing Log")
 
 	book.bookname = packageToWrite.GetBookName()
 	book.partsNum = packageToWrite.GetNumParts()
 
 	for _, chunk := range packageToWrite.GetPartsLocation() {
-		book.partsLocation[chunk.GetIndex()] = chunk.GetDatanode()
+		book.partsLocation[chunk.GetIndex()] = chunk.GetIpPuertoDatanode()
 	}
 
 	s.log = append(s.log, book)
+	fmt.Println("LOG")
+	for _, i := range s.log {
+		fmt.Printf("%s: ", i.bookname)
+		fmt.Printf("   %d:  ", i.partsNum)
+		fmt.Printf("   %x: ", i.partsLocation)
+		fmt.Println("---------------------------")
+	}
+	fmt.Println("")
+
+	//Codigo para escribir el log
+	file, err := os.OpenFile("Log.txt", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		file, err = os.Create("Log.txt")
+		if err != nil {
+			panic(err)
+		}
+	}
+	defer file.Close()
+	stringToWrite := ""
+	stringToWrite += book.bookname + " " + strconv.Itoa(int(book.partsNum)) + "\n"
+	stringToWrite += ...//Aquí va el resto 
+	_, err = file.WriteString()
 
 	s.mutex.Unlock()
 
