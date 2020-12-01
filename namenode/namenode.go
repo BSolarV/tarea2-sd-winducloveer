@@ -16,10 +16,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-/*
-Definitivamente no compila! c:
-No tenia el protoName y no sabia que más hacer C: */
-
 //IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
 	0: "localhost",
@@ -38,16 +34,15 @@ var PORTS = map[int64]string{
 
 func main() {
 
-	//reader := bufio.NewReader(os.Stdin)
-
 	//Iniciando proceso listen para Namenode
+	fmt.Println("beggin")
 	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
 	if err != nil {
 		fmt.Print("Fail listening on " + IPDIRECTIONS[3] + ":" + PORTS[3] + ".")
 		panic(err)
 	}
 	defer lis.Close()
-
+	fmt.Println("listen")
 	// Creando instancia del nodo
 	srv := newNameNode()
 	// creando instancia de servidor GRPC
@@ -55,12 +50,14 @@ func main() {
 
 	// ProtoLogistic.RegisterProtoLogisticServiceServer(grpcServer, srv)
 	protoName.RegisterProtoNameServiceServer(grpcServer, srv)
+	fmt.Println("service on")
 
 	// Montando servidor GRPC
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to mount GRPC server on port 9000: %v", err)
 	}
 
+	fmt.Println("Mounted")
 }
 
 //Book es la estructura de Libro

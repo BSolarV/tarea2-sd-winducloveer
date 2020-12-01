@@ -16,15 +16,20 @@ import (
 	"google.golang.org/grpc"
 )
 
+//IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
 	0: "localhost",
 	1: "localhost",
 	2: "localhost",
+	3: "localhost",
 }
+
+//PORTS son los puertos en los que esas direcciones ip's escuchan
 var PORTS = map[int64]string{
 	0: "9000",
 	1: "9001",
 	2: "9002",
+	3: "9003",
 }
 
 func main() {

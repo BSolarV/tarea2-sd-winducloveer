@@ -298,47 +298,50 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 	srv.iWantToWrite = true
 	srv.sinceWhenIWant = time.Now().Unix()
 
-	for _, index := range tempValidIndexes {
+	done := make(chan bool)
+	counter := 0
+	for _, index := range validIndexes {
 		if index != srv.index {
-			conn = connections[index]
-			done := make(chan bool)
-			counter := 0
-			go func() {
-				dataNodeService = protoNode.NewProtoServiceClient(conn)
-				fmt.Printf("Asking %d\n", index)
+			go func(index int) {
+				conn := connections[index]
+				dataNodeService := protoNode.NewProtoServiceClient(conn)
 				_, err = dataNodeService.WritePermisions(context.Background(), &protoNode.WriteRequest{Node: int64(srv.index), Timestamp: srv.sinceWhenIWant})
 				if err != nil {
 					fmt.Printf("ERROR! %s\n", err)
 				}
 				fmt.Printf("Recieved Response from %d\n", index)
 				counter += 1
-				if counter == len(tempValidIndexes)-1 {
-					done <- true
-				}
-			}()
-			<-done
-			fmt.Println("Yes")
-			con, err := grpc.Dial(IPDIRECTIONS[3]+":"+PORTS[3], grpc.WithInsecure())
-			if err != nil {
-				fmt.Printf("ERROR! %s\n", err)
-			}
-
-			nameNodeService := protoName.NewProtoNameServiceClient(con)
-
-			var sendToWrite *protoName.LogData
-
-			sendToWrite.BookName = splittedFile.Name
-			sendToWrite.NumParts = int64(len(splittedFile.Chunks))
-
-			for nod, chnklist := range proposal.dict {
-				for _, chnk := range chnklist {
-					sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]})
-				}
-			}
-
-			_, err = nameNodeService.WriteLog(context.Background(), sendToWrite)
+				done <- true
+			}(index)
 		}
 	}
+	for range done {
+		counter++
+		if counter == len(tempValidIndexes)-1 {
+			fmt.Println("Yes")
+			break
+		}
+	}
+	con, err := grpc.Dial(IPDIRECTIONS[3]+":"+PORTS[3], grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("ERROR! %s\n", err)
+	}
+
+	nameNodeService := protoName.NewProtoNameServiceClient(con)
+	fmt.Println("sendToWrite")
+	var sendToWrite protoName.LogData
+
+	sendToWrite.BookName = splittedFile.Name
+	sendToWrite.NumParts = int64(len(splittedFile.Chunks))
+	sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
+	fmt.Println("PartsLocation")
+	for nod, chnklist := range proposal.dict {
+		for _, chnk := range chnklist {
+			sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]})
+		}
+	}
+	fmt.Println("WriteLog")
+	_, err = nameNodeService.WriteLog(context.Background(), &sendToWrite)
 
 	srv.iWantToWrite = false
 
