@@ -481,14 +481,15 @@ func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *pr
 			}
 
 			if err != nil {
-				flag = false
+				//algo anda mal
+				fmt.Println("Algo anda mal")
 				break
 			}
 		}
 
 	}
 
-	return
+	return &protoNode.Empty{}, nil
 }
 
 //CentralizedBuildProposal es para Construir la unica propuesta que necesita para enviarsela al NameNode
