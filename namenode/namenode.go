@@ -200,3 +200,11 @@ func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.P
 	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
 	return &protoName.Response{Timestamp: time.Now().Unix(), Response: res}, nil
 }
+
+func (s *NameNode) GetBooks(ctx context.Context, empty *protoName.Empty) (*protoName.EveryBook, error) {
+	var books []string
+	for _, book := range s.log {
+		books = append(books, book.bookname)
+	}
+	return &protoName.EveryBook{Books: books}, nil
+}
