@@ -91,22 +91,26 @@ func newNameNode() *NameNode {
 //ClientRequest es invocada por el cliente para leer el log
 func (s *NameNode) ClientRequest(ctx context.Context, request *protoName.ReadRequest) (*protoName.LogData, error) {
 	s.mutex.Lock()
-	var paq *protoName.LogData
-
-	//var aux [len(request.partsLocation]string
+	paq := protoName.LogData{}
 	for _, book := range s.log {
+
 		if book.bookname == request.GetBookname() {
 			paq.BookName = book.bookname
 			paq.NumParts = book.partsNum
-
+			paq.PartsLocation = make([]*protoName.Part, 0)
 			for indx, node := range book.partsLocation {
-				paq.PartsLocation = append(paq.GetPartsLocation(), &protoName.Part{Index: indx, IpPuertoDatanode: node})
+				fmt.Printf("node: %s\n", node)
+				paq.PartsLocation = append(paq.PartsLocation, &protoName.Part{Index: indx, IpPuertoDatanode: node})
 			}
-
+			for _, elemento := range paq.PartsLocation {
+				fmt.Printf("indice: %d; ipPuerto: %s\n", elemento.GetIndex(), elemento.GetIpPuertoDatanode())
+			}
 		}
+
 	}
 	s.mutex.Unlock()
-	return paq, nil
+
+	return &paq, nil
 }
 
 //WriteRequest es innecesaria al parecer
@@ -122,6 +126,7 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 
 	book.bookname = packageToWrite.GetBookName()
 	book.partsNum = packageToWrite.GetNumParts()
+	book.partsLocation = make(map[int64]string)
 
 	for _, chunk := range packageToWrite.GetPartsLocation() {
 		book.partsLocation[chunk.GetIndex()] = chunk.GetIpPuertoDatanode()
@@ -196,18 +201,6 @@ func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.P
 		connections = append(connections, conn)
 	}
 	//Enviar a cada nodo la propuesta
-	agreement := false
-	for !agreement {
-		var props *protoNode.Proposal
-		props.Node = 3
-		props.NumChunks = 
-		agreement = true
-		for _, con := range connections {
-			dataNodeService := protoNode.NewProtoServiceClient(con)
-			ind, err = dataNodeService.PrintIndex()
-		}
-	}
-
 
 	//finaliza
 

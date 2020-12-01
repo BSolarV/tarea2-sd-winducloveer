@@ -174,7 +174,7 @@ func rebuildFile(name string) {
 		fmt.Print("Couldn't connect: ")
 		panic(err)
 	}
-
+	fmt.Printf("Conecting to Namenode\n")
 	nameNodeService := protoName.NewProtoNameServiceClient(conn)
 	bookData, err := nameNodeService.ClientRequest(context.Background(), &protoName.ReadRequest{Bookname: name})
 	if err != nil {
@@ -183,6 +183,7 @@ func rebuildFile(name string) {
 	}
 	conn.Close()
 
+	fmt.Printf("CreandoPDF\n")
 	newFileName := name + ".pdf"
 	_, err = os.Create(newFileName)
 	if err != nil {
@@ -190,6 +191,7 @@ func rebuildFile(name string) {
 		panic(err)
 	}
 
+	fmt.Printf("AbriendoPDF\n")
 	file, err := os.OpenFile(newFileName, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
 		fmt.Print("Something wetn wrong: ")
@@ -204,16 +206,20 @@ func rebuildFile(name string) {
 
 	var chunk *protoNode.Chunk
 	var chunkBufferBytes []byte
+	var socket string
+	fmt.Printf("Recorriendo BookData\n")
 	for j := uint64(0); j < uint64(bookData.GetNumParts()); j++ {
-		var socket string
+
 		for _, part := range bookData.PartsLocation {
 			if part.Index == int64(j) {
+				fmt.Printf("part.IpPuertoDatanode: %s\n", part.IpPuertoDatanode)
 				socket = part.IpPuertoDatanode
 				break
 			}
 		}
 
 		var conn *grpc.ClientConn
+		fmt.Printf("Socket: %s\n", socket)
 		conn, err = grpc.Dial(socket, grpc.WithInsecure())
 		if err != nil {
 			fmt.Print("Couldn't connect:")
@@ -222,6 +228,10 @@ func rebuildFile(name string) {
 		defer conn.Close()
 		dataNodeService := protoNode.NewProtoServiceClient(conn)
 		chunk, err = dataNodeService.GetChunk(context.Background(), &protoNode.Chunk{FileName: name, NumChunkActual: int64(j)})
+		if err != nil {
+			fmt.Println("Error!")
+			panic(err)
+		}
 
 		fmt.Println("Appending at position : [", writePosition, "] bytes")
 		writePosition = writePosition + 256000
@@ -231,6 +241,7 @@ func rebuildFile(name string) {
 		//ioutil.WriteFile(newFileName, chunkBufferBytes, os.ModeAppend)
 		chunkBufferBytes = chunk.Chunk
 		n, err := file.Write(chunkBufferBytes)
+		fmt.Println("archivo Escrito")
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

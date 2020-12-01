@@ -141,7 +141,7 @@ func (srv *DataNode) WritePermisions(ctx context.Context, writeRequest *protoNod
 func (*DataNode) RecieveChunks(ctx context.Context, chunksPackage *protoNode.ChunksPackage) (*protoNode.Empty, error) {
 	for _, oneChunk := range chunksPackage.Chunks {
 		fmt.Printf("Recieved part %d of book %s.\n", oneChunk.GetNumChunkActual(), chunksPackage.GetBookName())
-		fileName := chunksPackage.GetBookName() + "_" + strconv.FormatUint(uint64(oneChunk.GetNumChunkActual()), 10)
+		fileName := "bookParts/" + chunksPackage.GetBookName() + "_" + strconv.FormatUint(uint64(oneChunk.GetNumChunkActual()), 10)
 		_, err := os.Create(fileName)
 		if err != nil {
 			fmt.Println(err)
@@ -335,9 +335,12 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 	sendToWrite.NumParts = int64(len(splittedFile.Chunks))
 	sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
 	fmt.Println("PartsLocation")
+	var ipPort string
 	for nod, chnklist := range proposal.dict {
+		ipPort = IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]
+		fmt.Printf("ippuerto: %s", ipPort)
 		for _, chnk := range chnklist {
-			sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]})
+			sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: ipPort})
 		}
 	}
 	fmt.Println("WriteLog")
@@ -364,8 +367,10 @@ func (*DataNode) HeartBeat(ctx context.Context, Empty *protoNode.Empty) (*protoN
 }
 
 func (*DataNode) GetChunk(ctx context.Context, chunk *protoNode.Chunk) (*protoNode.Chunk, error) {
-	fileName := chunk.FileName + "_" + strconv.FormatUint(uint64(chunk.NumChunkActual), 10)
+	fmt.Println("In GetChunk")
+	fileName := "bookParts/" + chunk.FileName + "_" + strconv.FormatUint(uint64(chunk.NumChunkActual), 10)
 	file, err := os.Open(fileName)
+	fmt.Println("Oppened")
 	if err != nil {
 		fmt.Printf("Somthing went worng: \n")
 		panic(err)
@@ -373,6 +378,8 @@ func (*DataNode) GetChunk(ctx context.Context, chunk *protoNode.Chunk) (*protoNo
 	defer file.Close()
 	partBuffer := make([]byte, 256000)
 	file.Read(partBuffer)
+	fmt.Println("Readed")
 	chunk.Chunk = partBuffer
+	fmt.Println("returning Chunk")
 	return chunk, nil
 }
