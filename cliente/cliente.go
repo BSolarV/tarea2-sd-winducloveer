@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/BSolarV/tarea2-sd-winducloveer/protoName"
 	"github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
 	"google.golang.org/grpc"
 )
@@ -32,35 +33,55 @@ func main() {
 		for {
 			reader := bufio.NewReader(os.Stdin)
 
-			fmt.Print("Ingresar un libro? ")
+			fmt.Println("Escoja una opción:")
+			fmt.Println("	1 - Subir un Libro")
+			fmt.Println("	2 - Ver Lista de Libros")
+			fmt.Println("	3 - Bajar un libro")
+			fmt.Println("	0 - Salir")
+
+			fmt.Print("Elección (1, 2, 3 o 4): ")
 			text, _ := reader.ReadString('\n')
 			text = strings.Replace(text, "\n", "", -1)
 			text = strings.Replace(text, "\r", "", -1)
-			if text == "no" {
+
+			switch text {
+			case "1":
+				fmt.Print("Ingrese el nombre del libro: ")
+				text, _ := reader.ReadString('\n')
+				text = strings.Replace(text, "\n", "", -1)
+				text = strings.Replace(text, "\r", "", -1)
+				name := text
+				fmt.Print("Ingrese el nombre del archivo a subir: ")
+				text, _ = reader.ReadString('\n')
+				text = strings.Replace(text, "\n", "", -1)
+				text = strings.Replace(text, "\r", "", -1)
+				fileToBeChunked := text
+				fmt.Print("Ingrese a que DataNode subir (0, 1 o 2): ")
+				text, _ = reader.ReadString('\n')
+				text = strings.Replace(text, "\n", "", -1)
+				text = strings.Replace(text, "\r", "", -1)
+				dataNode, err := strconv.Atoi(text)
+				if err != nil {
+					panic(err)
+				}
+				sendFile(name, fileToBeChunked, dataNode)
+			case "2":
+
+			case "3":
+
+			case "4":
 				keep <- true
+			default:
+				fmt.Println("La opcion ingresada no es válida.")
 			}
-			sendFile()
+
 		}
 	}()
 	<-keep
 }
 
-func sendFile() {
-	const FILECHUNK = 256000 // 1 MB, change this to your requirement
-
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Print("Ingrese el nombre del libro: ")
-	text, _ := reader.ReadString('\n')
-	text = strings.Replace(text, "\n", "", -1)
-	text = strings.Replace(text, "\r", "", -1)
-	name := text
-	fmt.Printf("Nombre del libro: %s.\n", name)
-	fmt.Print("Ingrese el nombre del archivo a subir: ")
-	text, _ = reader.ReadString('\n')
-	text = strings.Replace(text, "\n", "", -1)
-	text = strings.Replace(text, "\r", "", -1)
-	fileToBeChunked := text
+func sendFile(name string, fileToBeChunked string, dataNode int) {
+	const FILECHUNK = 256000 // 250 KB = 250 * 1024 B
 
 	file, err := os.Open(fileToBeChunked)
 	if err != nil {
@@ -91,19 +112,9 @@ func sendFile() {
 		fmt.Printf("	%d piece: %x\n", i, partBuffer[:5])
 		listOfChunks = append(listOfChunks, partBuffer)
 	}
-	fmt.Printf("Splitted to %d pieces.\n", len(listOfChunks))
-
-	fmt.Print("Ingrese a que DataNode subir (0, 1 o 2): ")
-	text, _ = reader.ReadString('\n')
-	text = strings.Replace(text, "\n", "", -1)
-	text = strings.Replace(text, "\r", "", -1)
-	index, err := strconv.Atoi(text)
-	if err != nil {
-		panic(err)
-	}
 
 	var conn *grpc.ClientConn
-	conn, err = grpc.Dial(IPDIRECTIONS[int64(index)]+":"+PORTS[int64(index)], grpc.WithInsecure())
+	conn, err = grpc.Dial(IPDIRECTIONS[int64(dataNode)]+":"+PORTS[int64(dataNode)], grpc.WithInsecure())
 	if err != nil {
 		fmt.Print("Couldn't connect:")
 		panic(err)
@@ -113,9 +124,28 @@ func sendFile() {
 	splittedFile := &protoNode.SplittedFile{Name: name, Chunks: listOfChunks}
 	_, err = dataNodeService.UploadFile(context.Background(), splittedFile)
 	if err != nil {
-		fmt.Printf("Couldn't connect: %s", err)
+		fmt.Println("Something Went Wrong: ")
+		panic(err)
 	}
+	fmt.Printf("Sumbitted!\n")
+}
 
+func getBookList() []string {
+
+	conn, err := grpc.Dial(IPDIRECTIONS[3]+":"+PORTS[3], grpc.WithInsecure())
+	if err != nil {
+		fmt.Print("Couldn't connect: ")
+		panic(err)
+	}
+	defer conn.Close()
+
+	nameNodeService := protoName.NewProtoNameServiceClient(conn)
+	bookList, err := nameNodeService.GetBooks(context.Background(), &protoName.Empty{})
+	if err != nil {
+		fmt.Println("Something Went Wrong: ")
+		panic(err)
+	}
+	return bookList.Books
 }
 
 func rebuildFile(totalPartsNum uint64) {

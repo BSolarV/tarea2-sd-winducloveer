@@ -47,6 +47,9 @@ message Response {
     bool response = 3;
 }
 
+message EveryBook {
+    repeated string books = 1;
+}
 
 message Empty {}
 
@@ -61,6 +64,8 @@ service ProtoNameService {
     // Metodos cliente-NameNode
         // El cliente pide leer el Log para saber ubicación de los Chunks
     rpc ClientRequest(ReadRequest) returns (LogData) {} 
+
+    rpc GetBooks(Empty) returns (EveryBook) {} 
 }
 
 option go_package = "github.com/BSolarV/tarea2-sd-winducloveer/protoName";
