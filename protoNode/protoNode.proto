@@ -78,6 +78,8 @@ service ProtoService {
     // Metodos cliente-DataNode
         // Subir un archivo chunkeado
     rpc UploadFile(SplittedFile) returns (Empty) {}
+        // Bajar un chunk
+    rpc getChunk(Chunk) returns (Chunk) {}
 }
 
 option go_package = "github.com/BSolarV/tarea2-sd-winducloveer/protoNode";

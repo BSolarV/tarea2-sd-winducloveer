@@ -30,6 +30,7 @@ var PORTS = map[int64]string{
 func main() {
 	keep := make(chan bool)
 	go func() {
+		var name, text string
 		for {
 			reader := bufio.NewReader(os.Stdin)
 
@@ -40,17 +41,17 @@ func main() {
 			fmt.Println("	0 - Salir")
 
 			fmt.Print("Elección (1, 2, 3 o 4): ")
-			text, _ := reader.ReadString('\n')
+			text, _ = reader.ReadString('\n')
 			text = strings.Replace(text, "\n", "", -1)
 			text = strings.Replace(text, "\r", "", -1)
 
 			switch text {
 			case "1":
 				fmt.Print("Ingrese el nombre del libro: ")
-				text, _ := reader.ReadString('\n')
+				text, _ = reader.ReadString('\n')
 				text = strings.Replace(text, "\n", "", -1)
 				text = strings.Replace(text, "\r", "", -1)
-				name := text
+				name = text
 				fmt.Print("Ingrese el nombre del archivo a subir: ")
 				text, _ = reader.ReadString('\n')
 				text = strings.Replace(text, "\n", "", -1)
@@ -65,16 +66,29 @@ func main() {
 					panic(err)
 				}
 				sendFile(name, fileToBeChunked, dataNode)
+
 			case "2":
+				bookList := getBookList()
+				for _, oneBook := range bookList {
+					fmt.Printf("	%s\n", oneBook)
+				}
 
 			case "3":
+				fmt.Print("Ingrese el nombre del libro a bajar: ")
+				text, _ = reader.ReadString('\n')
+				text = strings.Replace(text, "\n", "", -1)
+				text = strings.Replace(text, "\r", "", -1)
+				name = text
+				rebuildFile(name)
 
 			case "4":
 				keep <- true
+
 			default:
 				fmt.Println("La opcion ingresada no es válida.")
-			}
 
+			}
+			fmt.Println()
 		}
 	}()
 	<-keep
@@ -148,25 +162,33 @@ func getBookList() []string {
 	return bookList.Books
 }
 
-func rebuildFile(totalPartsNum uint64) {
-	// just for fun, let's recombine back the chunked files in a new file
+func rebuildFile(name string) {
 
-	newFileName := "NEWbigfile.zip"
-	_, er := os.Create(newFileName)
-
-	if er != nil {
-		fmt.Println(er)
-		os.Exit(1)
+	conn, err := grpc.Dial(IPDIRECTIONS[3]+":"+PORTS[3], grpc.WithInsecure())
+	if err != nil {
+		fmt.Print("Couldn't connect: ")
+		panic(err)
 	}
 
-	//set the newFileName file to APPEND MODE!!
-	// open files r and w
+	nameNodeService := protoName.NewProtoNameServiceClient(conn)
+	bookData, err := nameNodeService.ClientRequest(context.Background(), &protoName.ReadRequest{Bookname: name})
+	if err != nil {
+		fmt.Print("Something wetn wrong: ")
+		panic(err)
+	}
+	conn.Close()
+
+	newFileName := name + ".pdf"
+	_, err = os.Create(newFileName)
+	if err != nil {
+		fmt.Print("Something went wrong: ")
+		panic(err)
+	}
 
 	file, err := os.OpenFile(newFileName, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		fmt.Print("Something wetn wrong: ")
+		panic(err)
 	}
 
 	// IMPORTANT! do not defer a file.Close when opening a file for APPEND mode!
@@ -175,51 +197,35 @@ func rebuildFile(totalPartsNum uint64) {
 	// just information on which part of the new file we are appending
 	var writePosition int64 = 0
 
-	for j := uint64(0); j < totalPartsNum; j++ {
-
-		//read a chunk
-		currentChunkFileName := "bigfile_" + strconv.FormatUint(j, 10)
-
-		newFileChunk, err := os.Open(currentChunkFileName)
-
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+	var chunk *protoNode.Chunk
+	var chunkBufferBytes []byte
+	for j := uint64(0); j < uint64(bookData.GetNumParts()); j++ {
+		var socket string
+		for _, part := range bookData.PartsLocation {
+			if part.Index == int64(j) {
+				socket = part.IpPuertoDatanode
+				break
+			}
 		}
 
-		defer newFileChunk.Close()
-
-		chunkInfo, err := newFileChunk.Stat()
-
+		var conn *grpc.ClientConn
+		conn, err = grpc.Dial(socket, grpc.WithInsecure())
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			fmt.Print("Couldn't connect:")
+			panic(err)
 		}
-
-		// calculate the bytes size of each chunk
-		// we are not going to rely on previous data and constant
-
-		var chunkSize int64 = chunkInfo.Size()
-		chunkBufferBytes := make([]byte, chunkSize)
+		defer conn.Close()
+		dataNodeService := protoNode.NewProtoServiceClient(conn)
+		chunk, err = dataNodeService.GetChunk(context.Background(), &protoNode.Chunk{FileName: name, NumChunkActual: int64(j)})
 
 		fmt.Println("Appending at position : [", writePosition, "] bytes")
-		writePosition = writePosition + chunkSize
-
-		// read into chunkBufferBytes
-		reader := bufio.NewReader(newFileChunk)
-		_, err = reader.Read(chunkBufferBytes)
-
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		writePosition = writePosition + 256000
 
 		// DON't USE ioutil.WriteFile -- it will overwrite the previous bytes!
 		// write/save buffer to disk
 		//ioutil.WriteFile(newFileName, chunkBufferBytes, os.ModeAppend)
-
+		chunkBufferBytes = chunk.Chunk
 		n, err := file.Write(chunkBufferBytes)
-
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

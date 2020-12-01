@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -140,6 +141,14 @@ func (srv *DataNode) WritePermisions(ctx context.Context, writeRequest *protoNod
 func (*DataNode) RecieveChunks(ctx context.Context, chunksPackage *protoNode.ChunksPackage) (*protoNode.Empty, error) {
 	for _, oneChunk := range chunksPackage.Chunks {
 		fmt.Printf("Recieved part %d of book %s.\n", oneChunk.GetNumChunkActual(), chunksPackage.GetBookName())
+		fileName := chunksPackage.GetBookName() + "_" + strconv.FormatUint(uint64(oneChunk.GetNumChunkActual()), 10)
+		_, err := os.Create(fileName)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		// write/save buffer to disk
+		ioutil.WriteFile(fileName, oneChunk.Chunk, os.ModeAppend)
 	}
 	return &protoNode.Empty{}, nil
 }
@@ -323,7 +332,7 @@ func (srv *DataNode) UploadFile(ctx context.Context, splittedFile *protoNode.Spl
 
 			for nod, chnklist := range proposal.dict {
 				for _, chnk := range chnklist {
-					sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), Datanode: int64(nod)})
+					sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]})
 				}
 			}
 
@@ -349,4 +358,18 @@ func (srv *DataNode) PrintIndex(ctx context.Context, _ *protoNode.Empty) (*proto
 
 func (*DataNode) HeartBeat(ctx context.Context, Empty *protoNode.Empty) (*protoNode.Empty, error) {
 	return &protoNode.Empty{}, nil
+}
+
+func (*DataNode) GetChunk(ctx context.Context, chunk *protoNode.Chunk) (*protoNode.Chunk, error) {
+	fileName := chunk.FileName + "_" + strconv.FormatUint(uint64(chunk.NumChunkActual), 10)
+	file, err := os.Open(fileName)
+	if err != nil {
+		fmt.Printf("Somthing went worng: \n")
+		panic(err)
+	}
+	defer file.Close()
+	partBuffer := make([]byte, 256000)
+	file.Read(partBuffer)
+	chunk.Chunk = partBuffer
+	return chunk, nil
 }
