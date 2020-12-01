@@ -1,4 +1,4 @@
-OrgulloYPrejuicio 5
+OrgulloYPrejuicio	5
 OrgulloYPrejuicio_0	localhost:9001
 OrgulloYPrejuicio_1	localhost:9000
 OrgulloYPrejuicio_2	localhost:9001

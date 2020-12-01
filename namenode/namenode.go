@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,6 +54,7 @@ func main() {
 
 	// Creando instancia del nodo
 	srv := newNameNode()
+	srv.loadLog()
 	// creando instancia de servidor GRPC
 	grpcServer := grpc.NewServer()
 
@@ -89,8 +92,60 @@ type NameNode struct {
 //NewServer es el constructor del Server
 func newNameNode() *NameNode {
 	var srv NameNode
+	srv.log = make([]Book, 0)
 
 	return &srv
+}
+
+func (srv *NameNode) loadLog() {
+	file, err := os.Open("log.txt")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	data := lines
+	var parcer []string
+	var partsLocation map[int64]string
+	var oneBook Book
+	var largo int
+	book := 0
+	var parts int64
+	for book < len(data) {
+
+		parcer = strings.Split(data[book], "	")
+		if len(parcer) != 2 {
+			book++
+			continue
+		}
+		largo, err = strconv.Atoi(parcer[1])
+		if err != nil {
+			fmt.Printf("%s - %s\n", parcer[0], parcer[1])
+			panic("No era un numero.")
+		}
+		oneBook = Book{bookname: parcer[0], partsNum: int64(largo)}
+		partsLocation = make(map[int64]string)
+		parts = 1
+		for parts <= int64(largo) {
+			parcer = strings.Split(data[int64(book)+parts], "	")
+			if len(parcer) != 2 {
+				parts++
+				continue
+			}
+			partsLocation[parts] = parcer[1]
+			parts++
+		}
+		oneBook.partsLocation = partsLocation
+		srv.log = append(srv.log, oneBook)
+		book += largo + 1
+	}
+	fmt.Printf("LOG CARGADO:\n %x\n	", srv.log)
 }
 
 //ClientRequest es invocada por el cliente para leer el log
@@ -157,7 +212,7 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	}
 	defer file.Close()
 	stringToWrite := ""
-	stringToWrite += book.bookname + " " + strconv.Itoa(int(book.partsNum)) + "\n"
+	stringToWrite += book.bookname + "	" + strconv.Itoa(int(book.partsNum)) + "\n"
 	keys := make([]int, 0, len(book.partsLocation))
 	for k := range book.partsLocation {
 		keys = append(keys, int(k))
@@ -262,6 +317,13 @@ func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.Pr
 			}
 		}
 
+	}
+
+	for _, connection := range connections {
+		if connection == nil {
+			continue
+		}
+		connection.Close()
 	}
 
 	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
