@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -153,8 +154,13 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	defer file.Close()
 	stringToWrite := ""
 	stringToWrite += book.bookname + " " + strconv.Itoa(int(book.partsNum)) + "\n"
-	for key, value := range book.partsLocation {
-		stringToWrite += "Parte: " + strconv.Itoa(int(key)) + "IpMaquina: " + value + "\n"
+	keys := make([]int, 0, len(book.partsLocation))
+	for k := range book.partsLocation {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for _, key := range keys {
+		stringToWrite += strconv.Itoa(int(key)) + "	" + book.partsLocation[int64(key)] + "\n"
 	}
 
 	_, err = file.WriteString(stringToWrite)
