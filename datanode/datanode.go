@@ -486,6 +486,34 @@ func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *pr
 				break
 			}
 		}
+		//Nuevo###############################################
+		fmt.Println("sendToWrite")
+		var sendToWrite protoName.LogData
+
+		sendToWrite.BookName = splittedFile.Name
+		sendToWrite.NumParts = int64(len(splittedFile.Chunks))
+		sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
+		fmt.Println("PartsLocation")
+		var ipPort string
+		for nod, chnklist := range proposal.dict {
+			ipPort = IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]
+			fmt.Printf("ippuerto: %s", ipPort)
+			for _, chnk := range chnklist {
+				sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: ipPort})
+			}
+		}
+		fmt.Println("WriteLog")
+		_, err = NameService.WriteLog(context.Background(), &sendToWrite)
+
+		srv.iWantToWrite = false
+
+		for _, connection := range connections {
+			if connection == nil {
+				continue
+			}
+			connection.Close()
+		}
+		conn.Close()
 
 	}
 
