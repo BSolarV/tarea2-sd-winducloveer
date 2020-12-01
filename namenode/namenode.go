@@ -175,6 +175,8 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.ProposalToNameNode) (*protoName.Response, error) {
 	res := true
 
+	iteration := 0
+
 	//Se conecta a todos los nodos y pregunta
 	var validIndexes []int
 	var connections []*grpc.ClientConn
@@ -207,6 +209,34 @@ func (s *NameNode) DistributeProposal(ctx context.Context, proposal *protoName.P
 		connections = append(connections, conn)
 	}
 	//Enviar a cada nodo la propuesta
+	agreement := false
+
+	var tempProposal *protoNode.Proposal
+
+	for !agreement {
+		agreement = true
+		for _, con := range connections {
+			dataNodeService := protoNode.NewProtoServiceClient(con)
+			ind, _ := dataNodeService.PrintIndex(context.Background(), &protoNode.Empty{})
+
+			//tempProposal se traspasa si es la 1era iteracion
+			if iteration == 0 {
+				aux, _ := strconv.Atoi(ind.GetId())
+				tempProposal.Node = int64(aux)
+				tempProposal.NumChunks = proposal.NodesRepart[aux]
+			} else {
+
+			}
+			response, _ := dataNodeService.CheckProposal(context.Background(), tempProposal)
+			if response.Response == false {
+				agreement = false
+				iteration++
+				continue
+			}
+			iteration++
+		}
+
+	}
 
 	//finaliza
 
@@ -220,4 +250,8 @@ func (s *NameNode) GetBooks(ctx context.Context, empty *protoName.Empty) (*proto
 		books = append(books, book.bookname)
 	}
 	return &protoName.EveryBook{Books: books}, nil
+}
+
+func GenerateProposal(validIndexes []int, numChunks int) {
+
 }
