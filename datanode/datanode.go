@@ -382,3 +382,125 @@ func (*DataNode) GetChunk(ctx context.Context, chunk *protoNode.Chunk) (*protoNo
 	fmt.Println("returning Chunk")
 	return chunk, nil
 }
+func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *protoNode.SplittedFile) (*protoNode.Empty, error) {
+	var validIndexes []int
+	var connections []*grpc.ClientConn
+	var service protoNode.ProtoServiceClient
+
+	// Estableciendo conexiones para proposal y enviar chunks
+	var conn *grpc.ClientConn
+	var err error
+	for i := 0; i < 3; i++ {
+		if i == srv.index {
+			validIndexes = append(validIndexes, i)
+			connections = append(connections, nil)
+			continue
+		}
+
+		conn, err = grpc.Dial(IPDIRECTIONS[int64(i)]+":"+PORTS[int64(i)], grpc.WithInsecure())
+		if err != nil {
+			// No se añade su indice como uno valido
+			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
+			continue
+		}
+
+		service = protoNode.NewProtoServiceClient(conn)
+		_, err = service.HeartBeat(context.Background(), &protoNode.Empty{})
+		if err != nil {
+			// No se añade su indice como uno valido
+			connections = append(connections, nil)
+			fmt.Printf("ERROR! %s\n", err)
+			continue
+		}
+
+		fmt.Printf("Indice: %d, estado: %s", i, conn.GetState())
+
+		validIndexes = append(validIndexes, i)
+		connections = append(connections, conn)
+	}
+
+	fmt.Printf("%x\n", validIndexes)
+	var dataNodeService protoNode.ProtoServiceClient
+	var proposal Proposal
+
+	var chunks []*protoNode.Chunk
+	var chunksToSend *protoNode.ChunksPackage
+
+	tempValidIndexes := make([]int, len(validIndexes))
+
+	_ = copy(tempValidIndexes, validIndexes)
+	fmt.Printf("%x\n", tempValidIndexes)
+	proposal, err = srv.BuildProposal(tempValidIndexes, connections, len(splittedFile.Chunks))
+
+	//Hay que enviar la propuesta al namenode
+	var pToNameNode *protoName.ProposalToNameNode
+	for key, value := range proposal.dict {
+		pToNameNode.NumChunks = int64(len(splittedFile.Chunks))
+		if key == 0 {
+			for _, i := range value {
+				pToNameNode.ChunksNode1 = append(pToNameNode.ChunksNode1, int64(i))
+			}
+		}
+		if key == 1 {
+			for _, i := range value {
+				pToNameNode.ChunksNode2 = append(pToNameNode.ChunksNode2, int64(i))
+			}
+		}
+		if key == 2 {
+			for _, i := range value {
+				pToNameNode.ChunksNode3 = append(pToNameNode.ChunksNode3, int64(i))
+			}
+		}
+		//Enviar proposal al namenode
+		//abir conexion al namenode
+		response, err := DistributeProposal(context.Background(), pToNameNode)
+		if response == false || err != nil {
+			//algo anda mal
+			fmt.Println("Algo anda mal")
+		}
+		//hacer el upload a cada nodo
+
+	}
+
+	return
+}
+
+//CentralizedBuildProposal es para Construir la unica propuesta que necesita para enviarsela al NameNode
+func (srv *DataNode) CentralizedBuildProposal(validIndexes []int, connections []*grpc.ClientConn, numOfChunks int) (Proposal, error) {
+	proposal := Proposal{dict: make(map[int][]int)}
+	var index int
+	var availableDataNodes []int
+	var dataNodeProposal *protoNode.Proposal
+	var response *protoNode.Response
+	var err error
+
+	availableDataNodes = validIndexes
+	for i := 0; i < numOfChunks; i++ {
+		if len(availableDataNodes) == 0 {
+			availableDataNodes = validIndexes
+		}
+		index = rand.Intn(len(availableDataNodes))
+		availableDataNodes[index] = availableDataNodes[len(availableDataNodes)-1]
+		availableDataNodes[len(availableDataNodes)-1] = 0
+		availableDataNodes = availableDataNodes[:len(availableDataNodes)-1]
+		proposal.dict[index] = append(proposal.dict[index], i)
+	}
+	var dataNodeService protoNode.ProtoServiceClient
+	for key, value := range proposal.dict {
+		dataNodeProposal = &protoNode.Proposal{Node: int64(srv.index), NumChunks: int64(len(value)), Timestamp: time.Now().Unix()}
+		if key == srv.index {
+			response, err = srv.CheckProposal(context.Background(), dataNodeProposal)
+		} else {
+			dataNodeService = protoNode.NewProtoServiceClient(connections[key])
+			response, err = dataNodeService.CheckProposal(context.Background(), dataNodeProposal)
+		}
+		if err != nil || !response.Response {
+			validIndexes[key] = validIndexes[len(validIndexes)-1]
+			validIndexes[len(validIndexes)-1] = 0
+			validIndexes = validIndexes[:len(validIndexes)-1]
+			continue
+		}
+	}
+	return proposal, nil
+}
