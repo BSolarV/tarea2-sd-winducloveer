@@ -454,12 +454,37 @@ func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *pr
 		}
 		//Enviar proposal al namenode
 		//abir conexion al namenode
-		response, err := DistributeProposal(context.Background(), pToNameNode)
-		if response == false || err != nil {
+		var conn *grpc.ClientConn
+		conn, err = grpc.Dial(IPDIRECTIONS[int64(3)]+":"+PORTS[int64(3)], grpc.WithInsecure())
+		NameService := protoName.NewProtoNameServiceClient(conn)
+		response, err := NameService.DistributeProposal(context.Background(), pToNameNode)
+		if response.Response == false || err != nil {
 			//algo anda mal
 			fmt.Println("Algo anda mal")
 		}
+
 		//hacer el upload a cada nodo
+		for key, value := range proposal.dict {
+
+			chunks = chunks[:0]
+
+			for i := 0; i < len(value); i++ {
+				chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(value[i]), Chunk: splittedFile.Chunks[value[i]]})
+			}
+			chunksToSend = &protoNode.ChunksPackage{BookName: splittedFile.Name, Chunks: chunks}
+
+			if key == srv.index {
+				_, err = srv.RecieveChunks(context.Background(), chunksToSend)
+			} else {
+				dataNodeService = protoNode.NewProtoServiceClient(connections[key])
+				_, err = dataNodeService.RecieveChunks(context.Background(), chunksToSend)
+			}
+
+			if err != nil {
+				flag = false
+				break
+			}
+		}
 
 	}
 

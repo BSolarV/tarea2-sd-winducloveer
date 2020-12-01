@@ -246,6 +246,7 @@ func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.Pr
 				proposal.dict[2] = append(proposal.dict[0], int(chnk))
 			}
 		}
+		iteration++
 		var dataNodeService protoNode.ProtoServiceClient
 		for key, value := range proposal.dict {
 			dataNodeProposal = &protoNode.Proposal{Node: int64(3), NumChunks: int64(len(value)), Timestamp: time.Now().Unix()}
