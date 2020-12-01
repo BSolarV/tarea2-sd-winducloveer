@@ -40,7 +40,6 @@ func main() {
 
 	//reader := bufio.NewReader(os.Stdin)
 
-
 	//Iniciando proceso listen para Namenode
 	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
 	if err != nil {
@@ -149,8 +148,11 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	defer file.Close()
 	stringToWrite := ""
 	stringToWrite += book.bookname + " " + strconv.Itoa(int(book.partsNum)) + "\n"
-	stringToWrite += ...//Aquí va el resto 
-	_, err = file.WriteString()
+	for key, value := range book.partsLocation {
+		stringToWrite += "Parte: " + strconv.Itoa(int(key)) + "IpMaquina: " + value + "\n"
+	}
+
+	_, err = file.WriteString(stringToWrite)
 
 	s.mutex.Unlock()
 
