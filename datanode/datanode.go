@@ -434,9 +434,11 @@ func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *pr
 	proposal, err = srv.BuildProposal(tempValidIndexes, connections, len(splittedFile.Chunks))
 
 	//Hay que enviar la propuesta al namenode
-	var pToNameNode *protoName.ProposalToNameNode
+
+	pToNameNode := &protoName.ProposalToNameNode{}
 	for key, value := range proposal.dict {
 		pToNameNode.NumChunks = int64(len(splittedFile.Chunks))
+
 		if key == 0 {
 			for _, i := range value {
 				pToNameNode.ChunksNode1 = append(pToNameNode.ChunksNode1, int64(i))
