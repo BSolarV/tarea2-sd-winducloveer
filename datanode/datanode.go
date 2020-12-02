@@ -454,70 +454,69 @@ func (srv *DataNode) CentralizedUploadFile(ctx context.Context, splittedFile *pr
 				pToNameNode.ChunksNode3 = append(pToNameNode.ChunksNode3, int64(i))
 			}
 		}
-		//Enviar proposal al namenode
-		//abir conexion al namenode
-		var conn *grpc.ClientConn
-		conn, err = grpc.Dial(IPDIRECTIONS[int64(3)]+":"+PORTS[int64(3)], grpc.WithInsecure())
-		NameService := protoName.NewProtoNameServiceClient(conn)
-		response, err := NameService.DistributeProposal(context.Background(), pToNameNode)
-		if response.Response == false || err != nil {
+	}
+	//Enviar proposal al namenode
+	//abir conexion al namenode
+
+	conn, err = grpc.Dial(IPDIRECTIONS[int64(3)]+":"+PORTS[int64(3)], grpc.WithInsecure())
+	NameService := protoName.NewProtoNameServiceClient(conn)
+	response, err := NameService.DistributeProposal(context.Background(), pToNameNode)
+	if response.Response == false || err != nil {
+		//algo anda mal
+		fmt.Println("Algo anda mal")
+	}
+
+	//hacer el upload a cada nodo
+	for key, value := range proposal.dict {
+
+		chunks = chunks[:0]
+
+		for i := 0; i < len(value); i++ {
+			chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(value[i]), Chunk: splittedFile.Chunks[value[i]]})
+		}
+		chunksToSend = &protoNode.ChunksPackage{BookName: splittedFile.Name, Chunks: chunks}
+
+		if key == srv.index {
+			_, err = srv.RecieveChunks(context.Background(), chunksToSend)
+		} else {
+			dataNodeService = protoNode.NewProtoServiceClient(connections[key])
+			_, err = dataNodeService.RecieveChunks(context.Background(), chunksToSend)
+		}
+
+		if err != nil {
 			//algo anda mal
 			fmt.Println("Algo anda mal")
+			break
 		}
-
-		//hacer el upload a cada nodo
-		for key, value := range proposal.dict {
-
-			chunks = chunks[:0]
-
-			for i := 0; i < len(value); i++ {
-				chunks = append(chunks, &protoNode.Chunk{FileName: splittedFile.Name, NumChunkActual: int64(value[i]), Chunk: splittedFile.Chunks[value[i]]})
-			}
-			chunksToSend = &protoNode.ChunksPackage{BookName: splittedFile.Name, Chunks: chunks}
-
-			if key == srv.index {
-				_, err = srv.RecieveChunks(context.Background(), chunksToSend)
-			} else {
-				dataNodeService = protoNode.NewProtoServiceClient(connections[key])
-				_, err = dataNodeService.RecieveChunks(context.Background(), chunksToSend)
-			}
-
-			if err != nil {
-				//algo anda mal
-				fmt.Println("Algo anda mal")
-				break
-			}
-		}
-		//Nuevo###############################################
-		fmt.Println("sendToWrite")
-		var sendToWrite protoName.LogData
-
-		sendToWrite.BookName = splittedFile.Name
-		sendToWrite.NumParts = int64(len(splittedFile.Chunks))
-		sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
-		fmt.Println("PartsLocation")
-		var ipPort string
-		for nod, chnklist := range proposal.dict {
-			ipPort = IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]
-			fmt.Printf("ippuerto: %s", ipPort)
-			for _, chnk := range chnklist {
-				sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: ipPort})
-			}
-		}
-		fmt.Println("WriteLog")
-		_, err = NameService.WriteLog(context.Background(), &sendToWrite)
-
-		srv.iWantToWrite = false
-
-		for _, connection := range connections {
-			if connection == nil {
-				continue
-			}
-			connection.Close()
-		}
-		conn.Close()
-
 	}
+	//Nuevo###############################################
+	fmt.Println("sendToWrite")
+	var sendToWrite protoName.LogData
+
+	sendToWrite.BookName = splittedFile.Name
+	sendToWrite.NumParts = int64(len(splittedFile.Chunks))
+	sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
+	fmt.Println("PartsLocation")
+	var ipPort string
+	for nod, chnklist := range proposal.dict {
+		ipPort = IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]
+		fmt.Printf("ippuerto: %s", ipPort)
+		for _, chnk := range chnklist {
+			sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: ipPort})
+		}
+	}
+	fmt.Println("WriteLog")
+	_, err = NameService.WriteLog(context.Background(), &sendToWrite)
+
+	srv.iWantToWrite = false
+
+	for _, connection := range connections {
+		if connection == nil {
+			continue
+		}
+		connection.Close()
+	}
+	conn.Close()
 
 	return &protoNode.Empty{}, nil
 }
