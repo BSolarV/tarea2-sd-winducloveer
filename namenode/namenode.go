@@ -20,19 +20,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-/*
-Definitivamente no compila! c:
-No tenia el protoName y no sabia que más hacer C: */
-
-//IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
-	0: "localhost",
-	1: "localhost",
-	2: "localhost",
-	3: "localhost",
+	0: "10.10.28.63",
+	1: "10.10.28.64",
+	2: "10.10.28.65",
+	3: "10.10.28.66",
 }
-
-//PORTS son los puertos en los que esas direcciones ip's escuchan
 var PORTS = map[int64]string{
 	0: "9000",
 	1: "9001",
@@ -40,9 +33,18 @@ var PORTS = map[int64]string{
 	3: "9003",
 }
 
+var DEBUG = false
+
 func main() {
 
-	//reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Iniciar en modo debug? ")
+	text, _ := reader.ReadString('\n')
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
+	if text == "yes" {
+		DEBUG = true
+	}
 
 	//Iniciando proceso listen para Namenode
 	lis, err := net.Listen("tcp", IPDIRECTIONS[3]+":"+PORTS[3])
@@ -193,14 +195,6 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	}
 
 	s.log = append(s.log, book)
-	fmt.Println("LOG")
-	for _, i := range s.log {
-		fmt.Printf("%s: ", i.bookname)
-		fmt.Printf("   %d:  ", i.partsNum)
-		fmt.Printf("   %x: ", i.partsLocation)
-		fmt.Println("---------------------------")
-	}
-	fmt.Println("")
 
 	//Codigo para escribir el log
 	file, err := os.OpenFile("Log.txt", os.O_APPEND|os.O_WRONLY, 0644)
@@ -223,6 +217,9 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 	}
 
 	_, err = file.WriteString(stringToWrite)
+	if DEBUG {
+		fmt.Printf("Estrito en: %d\n", time.Now().UnixNano()/int64(time.Millisecond))
+	}
 
 	s.mutex.Unlock()
 
@@ -231,7 +228,7 @@ func (s *NameNode) WriteLog(ctx context.Context, packageToWrite *protoName.LogDa
 }
 
 //DistributeProposal reparte la propuesta del datanode correspondiente
-func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.ProposalToNameNode) (*protoName.Response, error) {
+func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.ProposalToNameNode) (*protoName.ProposalToNameNode, error) {
 	iteration := 0
 
 	proposal := Proposal{dict: make(map[int][]int)}
@@ -266,8 +263,6 @@ func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.Pr
 			continue
 		}
 
-		fmt.Printf("Indice: %d, estado: %s", i, conn.GetState())
-
 		validIndexes = append(validIndexes, i)
 		connections = append(connections, conn)
 	}
@@ -295,10 +290,10 @@ func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.Pr
 				proposal.dict[0] = append(proposal.dict[0], int(chnk))
 			}
 			for _, chnk := range propose.ChunksNode2 {
-				proposal.dict[1] = append(proposal.dict[0], int(chnk))
+				proposal.dict[1] = append(proposal.dict[1], int(chnk))
 			}
 			for _, chnk := range propose.ChunksNode3 {
-				proposal.dict[2] = append(proposal.dict[0], int(chnk))
+				proposal.dict[2] = append(proposal.dict[2], int(chnk))
 			}
 		}
 		iteration++
@@ -326,8 +321,51 @@ func (s *NameNode) DistributeProposal(ctx context.Context, propose *protoName.Pr
 		connection.Close()
 	}
 
+	pToDataNode := &protoName.ProposalToNameNode{}
+	for key, value := range proposal.dict {
+		pToDataNode.NumChunks = int64(len(value))
+
+		if key == 0 {
+			pToDataNode.ChunksNode1 = make([]int64, 0)
+			for _, i := range value {
+				pToDataNode.ChunksNode1 = append(pToDataNode.ChunksNode1, int64(i))
+			}
+		}
+		if key == 1 {
+			pToDataNode.ChunksNode2 = make([]int64, 0)
+			for _, i := range value {
+				pToDataNode.ChunksNode2 = append(pToDataNode.ChunksNode2, int64(i))
+			}
+		}
+		if key == 2 {
+			pToDataNode.ChunksNode3 = make([]int64, 0)
+			for _, i := range value {
+				pToDataNode.ChunksNode3 = append(pToDataNode.ChunksNode3, int64(i))
+			}
+		}
+	}
+
 	//luego de recibir respuestas evalúa, y luego reenvía repuestao crea una nueva propuesta
-	return &protoName.Response{Timestamp: time.Now().Unix(), Response: agreement}, nil
+
+	//Nuevo###############################################
+	var sendToWrite protoName.LogData
+
+	sendToWrite.BookName = propose.Id
+	sendToWrite.NumParts = propose.NumChunks
+	sendToWrite.PartsLocation = make([]*protoName.Part, sendToWrite.NumParts)
+	var ipPort string
+	for nod, chnklist := range proposal.dict {
+		ipPort = IPDIRECTIONS[int64(nod)] + ":" + PORTS[int64(nod)]
+		for _, chnk := range chnklist {
+			sendToWrite.PartsLocation = append(sendToWrite.GetPartsLocation(), &protoName.Part{Index: int64(chnk), IpPuertoDatanode: ipPort})
+		}
+	}
+	if DEBUG {
+		fmt.Println("Writing Log")
+	}
+	_, err = s.WriteLog(context.Background(), &sendToWrite)
+
+	return pToDataNode, nil
 }
 
 func (s *NameNode) GetBooks(ctx context.Context, empty *protoName.Empty) (*protoName.EveryBook, error) {

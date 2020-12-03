@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/BSolarV/tarea2-sd-winducloveer/protoName"
 	"github.com/BSolarV/tarea2-sd-winducloveer/protoNode"
@@ -32,12 +33,25 @@ var PORTS = map[int64]string{
 	3: "9003",
 }
 
+var DEBUG = false
+
 func main() {
+	var name, text string
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Iniciar en modo debug? ")
+	text, _ = reader.ReadString('\n')
+	text = strings.Replace(text, "\n", "", -1)
+	text = strings.Replace(text, "\r", "", -1)
+	if text == "yes" {
+		DEBUG = true
+	}
+
 	keep := make(chan bool)
 	go func() {
-		var name, text string
+
 		for {
-			reader := bufio.NewReader(os.Stdin)
 
 			fmt.Println("Escoja una opción:")
 			fmt.Println("	1 - Subir un Libro")
@@ -70,6 +84,9 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
+				if DEBUG {
+					fmt.Printf("Enviando libro a: %d", time.Now().UnixNano()/int64(time.Millisecond))
+				}
 				sendFileCentralized(name, fileToBeChunked, dataNode)
 
 			case "2":
@@ -94,6 +111,7 @@ func main() {
 
 			}
 			fmt.Println()
+			fmt.Println()
 		}
 	}()
 	<-keep
@@ -117,7 +135,9 @@ func sendFileCentralized(name string, fileToBeChunked string, dataNode int) {
 
 	totalPartsNum := uint64(math.Ceil(float64(fileSize) / float64(FILECHUNK)))
 
-	fmt.Printf("Splitting to %d pieces.\n", totalPartsNum)
+	if DEBUG {
+		fmt.Printf("Splitting to %d pieces.\n", totalPartsNum)
+	}
 
 	var listOfChunks [][]byte
 
@@ -127,8 +147,9 @@ func sendFileCentralized(name string, fileToBeChunked string, dataNode int) {
 		partBuffer := make([]byte, partSize)
 
 		file.Read(partBuffer)
-
-		fmt.Printf("	%d piece: %x\n", i, partBuffer[:5])
+		if DEBUG {
+			fmt.Printf("	%d piece: %x\n", i, partBuffer[:5])
+		}
 		listOfChunks = append(listOfChunks, partBuffer)
 	}
 
@@ -146,7 +167,7 @@ func sendFileCentralized(name string, fileToBeChunked string, dataNode int) {
 		fmt.Println("Something Went Wrong: ")
 		panic(err)
 	}
-	fmt.Printf("Sumbitted!\n")
+	fmt.Printf("Libro enviado satisfactoriamente.\n")
 }
 
 func getBookListCentralized() []string {
@@ -174,7 +195,9 @@ func rebuildFileCentralized(name string) {
 		fmt.Print("Couldn't connect: ")
 		panic(err)
 	}
-	fmt.Printf("Conecting to Namenode\n")
+	if DEBUG {
+		fmt.Printf("Conecting to Namenode\n")
+	}
 	nameNodeService := protoName.NewProtoNameServiceClient(conn)
 	bookData, err := nameNodeService.ClientRequest(context.Background(), &protoName.ReadRequest{Bookname: name})
 	if err != nil {
@@ -183,7 +206,6 @@ func rebuildFileCentralized(name string) {
 	}
 	conn.Close()
 
-	fmt.Printf("CreandoPDF\n")
 	newFileName := name + ".pdf"
 	_, err = os.Create(newFileName)
 	if err != nil {
@@ -191,7 +213,6 @@ func rebuildFileCentralized(name string) {
 		panic(err)
 	}
 
-	fmt.Printf("AbriendoPDF\n")
 	file, err := os.OpenFile(newFileName, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
 		fmt.Print("Something wetn wrong: ")
@@ -207,19 +228,19 @@ func rebuildFileCentralized(name string) {
 	var chunk *protoNode.Chunk
 	var chunkBufferBytes []byte
 	var socket string
-	fmt.Printf("Recorriendo BookData\n")
+	if DEBUG {
+		fmt.Printf("Recorriendo BookData\n")
+	}
 	for j := uint64(0); j < uint64(bookData.GetNumParts()); j++ {
 
 		for _, part := range bookData.PartsLocation {
 			if part.Index == int64(j) {
-				fmt.Printf("part.IpPuertoDatanode: %s\n", part.IpPuertoDatanode)
 				socket = part.IpPuertoDatanode
 				break
 			}
 		}
 
 		var conn *grpc.ClientConn
-		fmt.Printf("Socket: %s\n", socket)
 		conn, err = grpc.Dial(socket, grpc.WithInsecure())
 		if err != nil {
 			fmt.Print("Couldn't connect:")
@@ -233,15 +254,16 @@ func rebuildFileCentralized(name string) {
 			panic(err)
 		}
 
-		fmt.Println("Appending at position : [", writePosition, "] bytes")
 		writePosition = writePosition + 256000
 
 		// DON't USE ioutil.WriteFile -- it will overwrite the previous bytes!
 		// write/save buffer to disk
 		//ioutil.WriteFile(newFileName, chunkBufferBytes, os.ModeAppend)
 		chunkBufferBytes = chunk.Chunk
-		n, err := file.Write(chunkBufferBytes)
-		fmt.Println("archivo Escrito")
+		_, err := file.Write(chunkBufferBytes)
+		if DEBUG {
+			fmt.Println("archivo Escrito")
+		}
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -255,10 +277,6 @@ func rebuildFileCentralized(name string) {
 		// also a good practice to clean up your own plate after eating
 
 		chunkBufferBytes = nil // reset or empty our buffer
-
-		fmt.Println("Written ", n, " bytes")
-
-		fmt.Println("Recombining part [", j, "] into : ", newFileName)
 	}
 
 	// now, we close the newFileName

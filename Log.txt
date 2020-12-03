@@ -1,48 +1,18 @@
-OrgulloYPrejuicio	5
-OrgulloYPrejuicio_0	localhost:9001
-OrgulloYPrejuicio_1	localhost:9000
-OrgulloYPrejuicio_2	localhost:9001
-OrgulloYPrejuicio_3	localhost:9000
-OrgulloYPrejuicio_4	localhost:9001
-c	5
-c_0	localhost:9002
-c_1	localhost:9001
-c_2	localhost:9000
-c_3	localhost:9002
-c_4	localhost:9001
-c	5
-c_0	localhost:9002
-c_1	localhost:9001
-c_2	localhost:9000
-c_3	localhost:9002
-c_4	localhost:9001
-c	5
-c_0	localhost:9002
-c_1	localhost:9001
-c_2	localhost:9000
-c_3	localhost:9002
-c_4	localhost:9001
-asd	5
-asd_0	localhost:9002
-asd_1	localhost:9001
-asd_2	localhost:9000
-asd_3	localhost:9002
-asd_4	localhost:9001
-asd	5
-asd_0	localhost:9002
-asd_1	localhost:9001
-asd_2	localhost:9000
-asd_3	localhost:9002
-asd_4	localhost:9001
-asd	5
-asd_0	localhost:9002
-asd_1	localhost:9001
-asd_2	localhost:9000
-asd_3	localhost:9002
-asd_4	localhost:9001
-este	5
-este_0	localhost:9002
-este_1	localhost:9001
-este_2	localhost:9000
-este_3	localhost:9002
-este_4	localhost:9001
+penpan	4
+penpan_0	localhost:9002
+penpan_1	localhost:9001
+penpan_2	localhost:9000
+penpan_3	localhost:9002
+DracDrac 	7
+DracDrac _0	localhost:9002
+DracDrac _1	localhost:9001
+DracDrac _2	localhost:9000
+DracDrac _3	localhost:9002
+DracDrac _4	localhost:9001
+DracDrac _5	localhost:9000
+DracDrac _6	localhost:9001
+franky	4
+franky_0	localhost:9002
+franky_1	localhost:9001
+franky_2	localhost:9000
+franky_3	localhost:9002

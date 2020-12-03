@@ -68,7 +68,7 @@ service ProtoNameService {
     
     // Metodos NameNode-Datanode
         // Coordinación entre DataNodes y entre NameNode con DataNode para verificar la propuesta
-    rpc DistributeProposal(ProposalToNameNode) returns (Response) {}
+    rpc DistributeProposal(ProposalToNameNode) returns (ProposalToNameNode) {}
         //Función para escribir el Log
     rpc WriteLog(LogData) returns (Empty) {}
 
