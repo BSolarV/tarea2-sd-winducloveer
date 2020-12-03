@@ -19,13 +19,11 @@ import (
 
 //IPDIRECTIONS son las direcciones Ip's
 var IPDIRECTIONS = map[int64]string{
-	0: "localhost",
-	1: "localhost",
-	2: "localhost",
-	3: "localhost",
+	0: "10.10.28.63",
+	1: "10.10.28.64",
+	2: "10.10.28.65",
+	3: "10.10.28.66",
 }
-
-//PORTS son los puertos en los que esas direcciones ip's escuchan
 var PORTS = map[int64]string{
 	0: "9000",
 	1: "9001",
