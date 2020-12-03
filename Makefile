@@ -1,7 +1,7 @@
 
 all: datanode clientDistributed clientCentralized namenode
 
-datanode: datanode/datanode.go
+buildDatanode: datanode/datanode.go
 	export GOROOT=/usr/local/go 
 	export GOPATH=$HOME/Projects/Proj1 
 	export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -10,7 +10,7 @@ ifneq ("$(wildcard $(./bin/datanode))","")
 endif
 	go build -o ./bin/datanode datanode/datanode.go
 
-clientDistributed: clientDistributed/clientDistributed.go
+buildClientDistributed: clientDistributed/clientDistributed.go
 	export GOROOT=/usr/local/go 
 	export GOPATH=$HOME/Projects/Proj1 
 	export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -19,7 +19,7 @@ ifneq ("$(wildcard $(./bin/clientDistributed))","")
 endif
 	go build -o ./bin/clientDistributed clientDistributed/clientDistributed.go
 
-clientCentralized: clientCentralized/clientCentralized.go
+buildClientCentralized: clientCentralized/clientCentralized.go
 	export GOROOT=/usr/local/go 
 	export GOPATH=$HOME/Projects/Proj1 
 	export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -28,7 +28,7 @@ ifneq ("$(wildcard $(./bin/clientCentralized))","")
 endif
 	go build -o ./bin/clientCentralized clientCentralized/clientCentralized.go
 
-namenode: namenode/namenode.go
+buildNamenode: namenode/namenode.go
 	export GOROOT=/usr/local/go 
 	export GOPATH=$HOME/Projects/Proj1 
 	export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
@@ -38,4 +38,6 @@ endif
 	go build -o ./bin/namenode namenode/namenode.go
 
 clearRegisters:
-	rm *.csv
+	rm *.txt
+	rm -r bookParts
+	mkdir bookParts
